@@ -1,18 +1,21 @@
 import { NextResponse } from 'next/server';
 import { addMessage } from '../../../../../lib/services/conversationRepository.js';
+import { withAuth } from '../../../../../lib/auth/guard.js';
+import { assertSessionAccess } from '../../../../../lib/auth/ownership.js';
+
+export const dynamic = 'force-dynamic';
 
 const ALLOWED_ROLES = new Set(['user', 'agent', 'system']);
 
-export async function POST(request, { params }) {
-  try {
-    const { role, content } = await request.json();
-    if (!ALLOWED_ROLES.has(role) || typeof content !== 'string' || !content.trim()) {
-      return NextResponse.json({ error: 'Invalid role or content' }, { status: 400 });
-    }
-    await addMessage(params.sessionId, role, content);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+export const POST = withAuth(async (user, request, { params }) => {
+  const { role, content } = await request.json();
+  if (!ALLOWED_ROLES.has(role) || typeof content !== 'string' || !content.trim()) {
+    return NextResponse.json({ error: 'Invalid role or content' }, { status: 400 });
   }
-}
+
+  // Reject appends to a chat owned by someone else; new sessions are claimed
+  // for this user on first insert.
+  await assertSessionAccess(user, params.sessionId);
+  await addMessage(params.sessionId, role, content, user.id);
+  return NextResponse.json({ ok: true });
+});

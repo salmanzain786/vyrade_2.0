@@ -7,6 +7,7 @@ import BlueprintSheet from '@/components/BlueprintSheet';
 import WorkflowModal from '@/components/WorkflowModal';
 import ConversationSidebar from '@/components/ConversationSidebar';
 import ThemeToggle from '@/components/ThemeToggle';
+import UserMenu from '@/components/auth/UserMenu';
 import { VyradeLogo } from '@/components/VyradeLogo';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -24,7 +25,7 @@ export function newChatId() {
  * The route component remounts this via `key={chatId}`, so all state below is
  * scoped to a single conversation — no manual resetting when switching chats.
  */
-export default function ChatWorkspace({ sessionId }) {
+export default function ChatWorkspace({ sessionId, user }) {
   const router = useRouter();
 
   const [messages, setMessages] = useState([]);
@@ -54,6 +55,10 @@ export default function ChatWorkspace({ sessionId }) {
   const refreshConversations = useCallback(async () => {
     try {
       const res = await fetch('/api/conversations');
+      if (res.status === 401) {
+        window.location.assign('/login');
+        return;
+      }
       const data = await res.json();
       if (res.ok) setConversations(data.conversations || []);
     } catch {
@@ -73,6 +78,10 @@ export default function ChatWorkspace({ sessionId }) {
       setLoadingChat(true);
       try {
         const res = await fetch(`/api/conversations/${sessionId}`);
+        if (res.status === 401) {
+          window.location.assign('/login');
+          return;
+        }
         const data = await res.json();
         if (cancelled) return;
         if (!res.ok) throw new Error(data.error || 'Failed to load conversation');
@@ -302,6 +311,8 @@ export default function ChatWorkspace({ sessionId }) {
               <SquarePen />
               New chat
             </Button>
+            <Separator orientation="vertical" className="mx-0.5 h-5" />
+            <UserMenu user={user} />
           </div>
         </header>
 

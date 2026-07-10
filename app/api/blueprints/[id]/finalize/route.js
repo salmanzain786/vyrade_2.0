@@ -1,21 +1,22 @@
 import { NextResponse } from 'next/server';
 import { finalizeBlueprint } from '../../../../../lib/services/blueprintService.js';
+import { withAuth } from '../../../../../lib/auth/guard.js';
+import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
 
-export async function POST(request, { params }) {
-  try {
-    const { expected_version } = await request.json();
-    if (expected_version === undefined) {
-      return NextResponse.json({ error: 'expected_version is required' }, { status: 400 });
-    }
+export const dynamic = 'force-dynamic';
 
-    const result = await finalizeBlueprint({
-      blueprintId: params.id,
-      expectedVersion: Number(expected_version),
-    });
+export const POST = withAuth(async (user, request, { params }) => {
+  await assertBlueprintOwner(user, params.id);
 
-    return NextResponse.json(result);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  const { expected_version } = await request.json();
+  if (expected_version === undefined) {
+    return NextResponse.json({ error: 'expected_version is required' }, { status: 400 });
   }
-}
+
+  const result = await finalizeBlueprint({
+    blueprintId: params.id,
+    expectedVersion: Number(expected_version),
+  });
+
+  return NextResponse.json(result);
+});

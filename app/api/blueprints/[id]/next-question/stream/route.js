@@ -1,6 +1,8 @@
 import { client, MODEL, temperatureFor } from '../../../../../../lib/config/openai.js';
 import { prepareQuestion } from '../../../../../../lib/services/clarificationAgent.js';
 import { getVersion } from '../../../../../../lib/services/blueprintRepository.js';
+import { withAuth } from '../../../../../../lib/auth/guard.js';
+import { assertBlueprintOwner } from '../../../../../../lib/auth/ownership.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +10,8 @@ export const dynamic = 'force-dynamic';
 // "true" signals the interview is complete (empty body). When a blocking gap
 // remains the model is forbidden from ending, so tokens can stream straight
 // through; the optional wrap-up case is resolved before responding.
-export async function POST(request, { params }) {
+export const POST = withAuth(async (user, request, { params }) => {
+  await assertBlueprintOwner(user, params.id);
   try {
     const { version, conversation_so_far } = await request.json();
     const current = await getVersion(params.id, Number(version));
@@ -71,4 +74,4 @@ export async function POST(request, { params }) {
       status: 500, headers: { 'Content-Type': 'application/json' },
     });
   }
-}
+});
