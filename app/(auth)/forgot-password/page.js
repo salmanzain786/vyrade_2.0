@@ -2,13 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import AuthShell, { Field, AuthLink } from '@/components/auth/AuthShell';
+import AuthShell, { Field, AuthInput, AuthButton, AuthLink } from '@/components/auth/AuthShell';
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
-  const [step, setStep] = useState('email'); // 'email' | 'reset' | 'done'
+  const [step, setStep] = useState('email'); // email | reset | done
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -19,49 +17,34 @@ export default function ForgotPasswordPage() {
 
   async function requestCode(e) {
     e.preventDefault();
-    setError(null);
-    setNotice(null);
-    setBusy(true);
+    setError(null); setNotice(null); setBusy(true);
     try {
       const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not send reset code');
       setNotice(data.message || 'If an account exists, a code is on its way.');
       setStep('reset');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
 
   async function submitReset(e) {
     e.preventDefault();
-    setError(null);
-    setNotice(null);
-    if (password !== confirm) {
-      setError('Passwords do not match');
-      return;
-    }
+    setError(null); setNotice(null);
+    if (password !== confirm) { setError('Passwords do not match'); return; }
     setBusy(true);
     try {
-      // 1) Exchange the OTP for a short-lived reset token.
       const verifyRes = await fetch('/api/auth/verify-reset-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),
       });
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok) throw new Error(verifyData.error || 'Invalid code');
 
-      // 2) Use that token to set the new password.
       const resetRes = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resetToken: verifyData.resetToken, password }),
       });
       const resetData = await resetRes.json();
@@ -69,11 +52,7 @@ export default function ForgotPasswordPage() {
 
       setStep('done');
       setTimeout(() => router.push('/login'), 1500);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
 
   if (step === 'done') {
@@ -89,38 +68,21 @@ export default function ForgotPasswordPage() {
       <AuthShell
         title="Reset your password"
         subtitle={`Enter the 6-digit code sent to ${email} and choose a new password.`}
-        error={error}
-        notice={notice}
+        error={error} notice={notice}
         footer={<AuthLink href="/login">Back to sign in</AuthLink>}
       >
-        <form onSubmit={submitReset} className="space-y-4">
-          <Field label="Reset code" htmlFor="code">
-            <Input
-              id="code"
-              inputMode="numeric"
-              pattern="\d{6}"
-              maxLength={6}
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              placeholder="123456"
-              className="tracking-[0.4em] text-center font-mono text-lg"
-            />
+        <form onSubmit={submitReset} className="space-y-3">
+          <Field htmlFor="code">
+            <AuthInput id="code" inputMode="numeric" pattern="\d{6}" maxLength={6} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="123456" className="tracking-[0.4em] text-center text-lg" />
           </Field>
-
-          <Field label="New password" htmlFor="password" hint="At least 8 characters.">
-            <Input id="password" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          <Field htmlFor="password" hint="At least 8 characters.">
+            <AuthInput id="password" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="New password" />
           </Field>
-
-          <Field label="Confirm new password" htmlFor="confirm">
-            <Input id="confirm" type="password" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" />
+          <Field htmlFor="confirm">
+            <AuthInput id="confirm" type="password" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm new password" />
           </Field>
-
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? 'Updating…' : 'Update password'}
-          </Button>
-
-          <button type="button" onClick={() => setStep('email')} className="w-full text-center text-sm text-muted-foreground hover:text-foreground">
+          <AuthButton type="submit" loading={busy}>Update password</AuthButton>
+          <button type="button" onClick={() => setStep('email')} className="w-full text-center text-sm text-white/50 hover:text-white">
             Use a different email
           </button>
         </form>
@@ -132,18 +94,14 @@ export default function ForgotPasswordPage() {
     <AuthShell
       title="Forgot password"
       subtitle="Enter your email and we’ll send a 6-digit reset code."
-      error={error}
-      notice={notice}
+      error={error} notice={notice}
       footer={<AuthLink href="/login">Back to sign in</AuthLink>}
     >
-      <form onSubmit={requestCode} className="space-y-4">
-        <Field label="Email" htmlFor="email">
-          <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
+      <form onSubmit={requestCode} className="space-y-3">
+        <Field htmlFor="email">
+          <AuthInput id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" />
         </Field>
-
-        <Button type="submit" className="w-full" disabled={busy}>
-          {busy ? 'Sending…' : 'Send reset code'}
-        </Button>
+        <AuthButton type="submit" loading={busy}>Send reset code</AuthButton>
       </form>
     </AuthShell>
   );

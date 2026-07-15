@@ -1,6 +1,7 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { Loader2, Copy, Download, FileCode2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -99,7 +100,7 @@ function ReadinessMeter({ readiness }) {
       <Progress
         value={pct}
         indicatorClassName={cn(
-          complete ? 'bg-[hsl(var(--success))]' : blocked ? 'bg-[hsl(var(--warning))]' : 'bg-primary'
+          complete ? 'bg-[oklch(var(--success))]' : blocked ? 'bg-[oklch(var(--warning))]' : 'bg-primary'
         )}
       />
     </div>
@@ -107,7 +108,8 @@ function ReadinessMeter({ readiness }) {
 }
 
 export default function BlueprintSheet({
-  blueprint, readiness, version, blueprintId, onGenerate, generating, workflow, onViewWorkflow,
+  blueprint, readiness, version, blueprintId, onGenerate, generating, workflow, workflowStale, onViewWorkflow,
+  onExportPlatform, onCopyPrompt, exportingPlatform, platformReadiness,
 }) {
   const bp = blueprint;
   const canGenerate = readiness?.status === 'requirements_complete' && !generating;
@@ -127,7 +129,7 @@ export default function BlueprintSheet({
   }
 
   return (
-    <div className="relative flex min-h-0 flex-col bg-card/40 blueprint-grid">
+    <div className="relative flex h-full min-h-0 flex-col bg-card">
       <RegistrationMarks />
 
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 pb-3 pt-5">
@@ -222,7 +224,7 @@ export default function BlueprintSheet({
 
             {hasOpenItems && (
               <Section number="07" title="Open items" filled={false} isLast>
-                <ul className="list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-[hsl(var(--warning))] marker:text-[hsl(var(--warning))]">
+                <ul className="list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-[oklch(var(--warning))] marker:text-[oklch(var(--warning))]">
                   {bp.unknown_requirements.map((u, i) => <li key={i}>{u.reason}</li>)}
                 </ul>
               </Section>
@@ -249,6 +251,16 @@ export default function BlueprintSheet({
       <div className="scrollbar-thin max-h-[58%] shrink-0 overflow-y-auto border-t-2 border-primary/40 bg-background/70 px-5 py-4 backdrop-blur lg:max-h-none lg:overflow-visible">
         <ReadinessMeter readiness={readiness} />
 
+        {workflow && workflowStale && (
+          <div
+            role="alert"
+            className="mb-3 rounded-md border border-[oklch(var(--warning))]/40 bg-[oklch(var(--warning))]/10 px-3 py-2 text-[12px] leading-snug text-foreground"
+          >
+            <span className="font-medium">Workflow outdated.</span>{' '}
+            The Blueprint changed after this workflow was generated. Regenerate to match the current Blueprint.
+          </div>
+        )}
+
         <WorkflowRouting
           canGenerate={canGenerate}
           generating={generating}
@@ -256,7 +268,23 @@ export default function BlueprintSheet({
           onGenerate={onGenerate}
           onViewWorkflow={onViewWorkflow}
           onDownload={handleDownload}
+          hasBlueprint={!!blueprintId}
+          exportingPlatform={exportingPlatform}
+          platformReadiness={platformReadiness}
+          onExportPlatform={onExportPlatform}
         />
+
+        {blueprintId && (onExportPlatform || onCopyPrompt) && (
+          <div className="mb-3 mt-2 grid grid-cols-2 gap-1.5">
+            <Button variant="ghost" size="sm" onClick={onCopyPrompt} className="h-8 gap-1.5 text-xs">
+              <Copy className="h-3.5 w-3.5" /> Copy prompt
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => onExportPlatform?.('claude')} disabled={exportingPlatform === 'claude'} className="h-8 gap-1.5 text-xs">
+              <FileCode2 className="h-3.5 w-3.5" />
+              {exportingPlatform === 'claude' ? 'Preparing…' : 'Claude package'}
+            </Button>
+          </div>
+        )}
 
         <Separator className="mb-3" />
 

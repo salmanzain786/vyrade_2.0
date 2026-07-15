@@ -47,5 +47,9 @@ export function middleware(request) {
 // included so unauthenticated API calls short-circuit here too (auth APIs are
 // re-allowed above).
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.svg$).*)'],
+  // Skip Next internals and static assets (fonts/images/etc.) so the login page
+  // can load them while signed out. `/api` is handled in the function body.
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|otf|css|js|map)$).*)',
+  ],
 };

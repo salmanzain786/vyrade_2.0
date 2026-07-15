@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
  * text that explains why the target is unavailable.
  */
 
-const ROUTES = ['n8n', 'make', 'zapier', 'tools', 'mcp'];
+const ROUTES = ['n8n', 'make', 'zapier', 'tools', 'claude'];
 
 function Drop({ live }) {
   return (
@@ -62,8 +62,13 @@ export default function WorkflowRouting({
   onGenerate,
   onViewWorkflow,
   onDownload,
+  hasBlueprint,
+  exportingPlatform,
+  platformReadiness,
+  onExportPlatform,
 }) {
   const live = canGenerate || !!workflow;
+  const readiness = platformReadiness || {};
 
   const n8nStatus = generating
     ? 'Generating…'
@@ -72,6 +77,33 @@ export default function WorkflowRouting({
       : canGenerate
         ? 'Generate workflow'
         : 'Finish the blueprint first';
+
+  // Per-chip state — enabled/live/status/onClick driven by platform readiness.
+  function routeState(key) {
+    if (key === 'n8n') {
+      return { readiness: 'full', enabled: !!canGenerate, live, status: n8nStatus, onClick: onGenerate };
+    }
+    if (key === 'claude') {
+      return {
+        readiness: 'full', enabled: !!hasBlueprint, live: !!hasBlueprint,
+        status: exportingPlatform === 'claude' ? 'Preparing…' : hasBlueprint ? 'Export package' : 'Start a blueprint first',
+        onClick: () => onExportPlatform?.('claude'),
+      };
+    }
+    if (key === 'make' || key === 'zapier') {
+      const r = readiness[key] || 'coming_soon';
+      const enabled = r === 'guide' && !!hasBlueprint;
+      const status = exportingPlatform === key
+        ? 'Preparing…'
+        : r === 'coming_soon' ? 'Coming soon'
+          : hasBlueprint ? 'Guide only' : 'Start a blueprint first';
+      return { readiness: r, enabled, live: enabled, status, onClick: () => onExportPlatform?.(key) };
+    }
+    // tools / anything else — not an export platform yet.
+    return { readiness: 'coming_soon', enabled: false, live: false, status: 'Coming soon', onClick: undefined };
+  }
+
+  const wired = ROUTES.reduce((n, k) => n + (routeState(k).readiness !== 'coming_soon' ? 1 : 0), 0);
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -82,7 +114,7 @@ export default function WorkflowRouting({
           </span>
           <span aria-hidden="true" className="h-px flex-1 bg-border" />
           <span className="font-mono text-[10px] text-muted-foreground">
-            1 of {ROUTES.length} wired
+            {wired} of {ROUTES.length} wired
           </span>
         </div>
 
@@ -120,9 +152,8 @@ export default function WorkflowRouting({
           <div className="flex items-center justify-between pt-4">
             {ROUTES.map((key, i) => {
               const meta = PLATFORMS[key];
-              const isN8n = key === 'n8n';
-              const enabled = isN8n && canGenerate;
-              const status = isN8n ? n8nStatus : 'Coming soon';
+              const st = routeState(key);
+              const isTarget = st.readiness !== 'coming_soon'; // wired (not coming soon)
 
               return (
                 <Fragment key={key}>
@@ -131,30 +162,30 @@ export default function WorkflowRouting({
                   )}
 
                   <div className="relative flex flex-1 justify-center">
-                    <Drop live={isN8n && live} />
-                    <Node live={isN8n && live} />
+                    <Drop live={st.live} />
+                    <Node live={st.live} />
 
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-disabled={!enabled}
-                          aria-label={`${meta.name} — ${status}`}
-                          onClick={enabled ? onGenerate : (e) => e.preventDefault()}
+                          aria-disabled={!st.enabled}
+                          aria-label={`${meta.name} — ${st.status}`}
+                          onClick={st.enabled ? st.onClick : (e) => e.preventDefault()}
                           className={cn(
                             // 44px hit area, per the touch-target minimum.
                             'relative h-11 w-11',
-                            enabled && 'bg-primary/10 hover:bg-primary/20',
+                            st.enabled && 'bg-primary/10 hover:bg-primary/20',
                             // aria-disabled keeps pointer events, so ghost's
                             // hover:bg-accent has to be cancelled by hand.
-                            !enabled && 'cursor-not-allowed hover:bg-transparent',
-                            isN8n && !enabled && 'opacity-70',
-                            !isN8n && 'opacity-55'
+                            !st.enabled && 'cursor-not-allowed hover:bg-transparent',
+                            isTarget && !st.enabled && 'opacity-70',
+                            !isTarget && 'opacity-55'
                           )}
                         >
                           <PlatformChip platform={key} />
-                          {enabled && (
+                          {st.enabled && (
                             <Sparkles
                               aria-hidden="true"
                               className="absolute -right-0.5 -top-0.5 !size-3 text-primary"
@@ -164,7 +195,7 @@ export default function WorkflowRouting({
                       </TooltipTrigger>
                       <TooltipContent side="top" className="flex flex-col items-center gap-0.5">
                         <span className="font-mono text-[11px] font-semibold">{meta.name}</span>
-                        <span className="text-[10.5px] text-muted-foreground">{status}</span>
+                        <span className="text-[10.5px] text-muted-foreground">{st.status}</span>
                       </TooltipContent>
                     </Tooltip>
                   </div>

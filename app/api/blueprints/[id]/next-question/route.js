@@ -9,10 +9,10 @@ export const POST = withAuth(async (user, request, { params }) => {
   await assertBlueprintOwner(user, params.id);
 
   const { version, conversation_so_far } = await request.json();
-  const question = await getNextQuestion({
+  const result = await getNextQuestion({
     blueprintId: params.id,
     version: Number(version),
     conversationSoFar: conversation_so_far || '',
   });
-  return NextResponse.json({ question });
+  return NextResponse.json({ question: result.text, done: result.done, usage: result.usage });
 });

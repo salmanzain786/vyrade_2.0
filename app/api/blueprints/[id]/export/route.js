@@ -1,0 +1,53 @@
+import { NextResponse } from 'next/server';
+import JSZip from 'jszip';
+import { runPlatformExport, UnsupportedPlatformError } from '../../../../../lib/services/exportService.js';
+import { withAuth } from '../../../../../lib/auth/guard.js';
+import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
+
+export const dynamic = 'force-dynamic';
+
+function slug(s) {
+  return String(s || 'automation').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'automation';
+}
+
+// Unified export endpoint (Task 11). POST { platform, version?, part? }
+//  - platform is REQUIRED — Make/Zapier cannot run without an explicit route.
+//  - n8n → JSON { workflow }
+//  - claude/make/zapier → ZIP download (or JSON { prompt } when part='prompt')
+export const POST = withAuth(async (user, request, { params }) => {
+  await assertBlueprintOwner(user, params.id);
+
+  const body = await request.json().catch(() => ({}));
+  if (!body.platform) {
+    throw new UnsupportedPlatformError('Select an export platform (n8n, claude, make, or zapier).');
+  }
+
+  const result = await runPlatformExport({
+    blueprintId: params.id,
+    version: body.version ? Number(body.version) : null,
+    platform: body.platform,
+  });
+
+  if (result.kind === 'workflow') {
+    return NextResponse.json({ platform: result.platform, readiness: result.readiness, workflow: result.workflow });
+  }
+
+  if (body.part === 'prompt' && result.prompt) {
+    return NextResponse.json({ platform: result.platform, prompt: result.prompt, files: Object.keys(result.files || {}) });
+  }
+
+  const zip = new JSZip();
+  for (const [name, content] of Object.entries(result.files || {})) zip.file(name, content);
+  const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+  const suffix = result.kind === 'guide' ? 'guide' : 'package';
+  return new Response(buffer, {
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${slug(result.name)}-${result.platform}-${suffix}.zip"`,
+      'X-Export-Readiness': result.readiness || '',
+      'X-Export-Grounded': String(result.grounded ?? ''),
+      'Cache-Control': 'no-store',
+    },
+  });
+});

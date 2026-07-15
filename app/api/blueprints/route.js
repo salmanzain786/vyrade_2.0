@@ -32,6 +32,9 @@ export const POST = withAuth(async (user, request) => {
       status: result.status,
       blueprint: result.blueprint,
       readiness: result.readiness,
+      // Token usage of generating this blueprint — the client forwards it to the
+      // next-question call so it's attributed to the conversation's total.
+      usage: result.usage,
     },
     { status: 201 }
   );

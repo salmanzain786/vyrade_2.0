@@ -40,5 +40,6 @@ export const PATCH = withAuth(async (user, request, { params }) => {
     status: result.status,
     blueprint: result.blueprint,
     readiness: result.readiness,
+    usage: result.usage, // forwarded to the next-question call for cost accounting
   });
 });

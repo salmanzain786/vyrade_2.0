@@ -34,9 +34,9 @@ export default function ConversationSidebar({ conversations, currentSessionId, o
           <VyradeMark className="hidden h-6 w-auto shrink-0 group-data-[collapsible=icon]:block" />
           <div className="flex min-w-0 flex-col gap-1 group-data-[collapsible=icon]:hidden">
             <VyradeLogo className="h-[18px] w-auto text-sidebar-foreground" />
-            <span className="truncate pl-[1px] font-mono text-[10px] text-muted-foreground">
+            {/* <span className="truncate pl-[1px] font-mono text-[10px] text-muted-foreground">
               blueprint engine
-            </span>
+            </span> */}
           </div>
         </div>
       </SidebarHeader>
