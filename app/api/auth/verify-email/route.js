@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server';
-import { verifyEmail, AuthError } from '../../../../lib/services/authService.js';
+import { verifyEmail } from '../../../../lib/services/authService.js';
 import { setSessionCookie } from '../../../../lib/auth/session.js';
+import { withRateLimit } from '../../../../lib/auth/rateLimit.js';
+import { authErrorResponse } from '../../../../lib/auth/routeHelpers.js';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  const body = await request.json().catch(() => ({}));
   try {
-    const body = await request.json();
-    const { userId } = await verifyEmail(body);
+    // Caps OTP guessing across codes (the per-code 5-attempt limit only guards
+    // a single issued code — a client could otherwise re-request and retry).
+    const { userId } = await withRateLimit(
+      { request, event: 'verify_email', email: body.email },
+      () => verifyEmail(body)
+    );
     // Verifying the email also logs the user in.
     setSessionCookie(userId);
     return NextResponse.json({ ok: true, message: 'Email verified. You are now signed in.' });
   } catch (err) {
-    if (err instanceof AuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.statusCode });
-    }
-    console.error(err);
-    return NextResponse.json({ error: 'Verification failed' }, { status: 500 });
+    return authErrorResponse(err, 'Verification failed');
   }
 }

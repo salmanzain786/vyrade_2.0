@@ -50,6 +50,7 @@ async function migrate() {
   await runFile(connection, 'schema.sql', { tolerant: false });
   await runFile(connection, 'auth.sql', { tolerant: true });
   await runFile(connection, 'usage.sql', { tolerant: true });
+  await runFile(connection, 'auth_hardening.sql', { tolerant: true });
 
   console.log('Migration applied successfully.');
   await connection.end();

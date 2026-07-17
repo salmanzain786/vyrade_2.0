@@ -1,18 +1,22 @@
 import { NextResponse } from 'next/server';
-import { resetPassword, AuthError } from '../../../../lib/services/authService.js';
+import { resetPassword } from '../../../../lib/services/authService.js';
+import { withRateLimit } from '../../../../lib/auth/rateLimit.js';
+import { authErrorResponse } from '../../../../lib/auth/routeHelpers.js';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  const body = await request.json().catch(() => ({}));
   try {
-    const body = await request.json();
-    await resetPassword(body);
+    // The caller proves itself with a signed reset token, so there's no email in
+    // the body — this is IP-throttled and audited (the audit row gets the userId
+    // the token resolved to).
+    await withRateLimit(
+      { request, event: 'reset_password', email: null },
+      () => resetPassword(body)
+    );
     return NextResponse.json({ ok: true, message: 'Password updated. You can now sign in.' });
   } catch (err) {
-    if (err instanceof AuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.statusCode });
-    }
-    console.error(err);
-    return NextResponse.json({ error: 'Could not reset password' }, { status: 500 });
+    return authErrorResponse(err, 'Could not reset password');
   }
 }

@@ -1,0 +1,152 @@
+{
+  "name": "Shopify Order → Google Sheet row + Slack notification",
+  "business_intent": {
+    "business_goal": "Record every new Shopify order in a central Google Sheet and notify the sales team in Slack.",
+    "desired_outcome": "Each new Shopify order creates a new row in the designated Google Sheet and a message is posted to #sales. If the sheet write ultimately fails, the team is notified in Slack."
+  },
+  "trigger": {
+    "trigger_type": "event",
+    "event": "new_order_created",
+    "source_system": "Shopify",
+    "schedule": "null"
+  },
+  "systems": [
+    {
+      "name": "Shopify",
+      "role": "order event source",
+      "required": false
+    },
+    {
+      "name": "Google Sheets",
+      "role": "destination datastore (append one row per order)",
+      "required": false
+    },
+    {
+      "name": "Slack",
+      "role": "notification channel (post to #sales)",
+      "required": false
+    }
+  ],
+  "data_inputs": [],
+  "process_steps": [
+    {
+      "step_id": "s1_receive_order_event",
+      "sequence": 1,
+      "action": "Receive new order event from Shopify and extract order payload.",
+      "action_type": "receive_data"
+    },
+    {
+      "step_id": "s2_map_order_fields",
+      "sequence": 2,
+      "action": "Map/extract required order fields to the Google Sheet row schema (columns).",
+      "action_type": "transform_data"
+    },
+    {
+      "step_id": "s3_write_sheet_row",
+      "sequence": 3,
+      "action": "Append a row to the configured Google Sheet with mapped order data.",
+      "action_type": "write_data"
+    },
+    {
+      "step_id": "s4_on_success_notify_slack",
+      "sequence": 4,
+      "action": "Post a message to Slack #sales with order summary for every order (must run on every order).",
+      "action_type": "notification"
+    },
+    {
+      "step_id": "s5_on_write_failure_retry",
+      "sequence": 5,
+      "action": "If the sheet write fails, retry the write action up to 2 additional times (total 3 attempts).",
+      "action_type": "wait"
+    },
+    {
+      "step_id": "s6_on_final_failure_notify_slack",
+      "sequence": 6,
+      "action": "If all retries fail, post a failure alert to Slack #sales with failure details and order reference.",
+      "action_type": "notification"
+    }
+  ],
+  "business_rules": [
+    {
+      "rule_id": "br_post_slack_every_order",
+      "description": "Post to Slack #sales for every new Shopify order, regardless of sheet write success or failure (success posts and failure alert posts after retries exhausted).",
+      "condition": {
+        "field": "event_type",
+        "operator": "equals",
+        "value": [
+          "new_order"
+        ]
+      },
+      "result": {
+        "action": "notify",
+        "value": "post_to_slack_#sales"
+      }
+    }
+  ],
+  "exception_rules": [
+    {
+      "exception_id": "ex_sheet_write_failed_after_retries",
+      "scenario": "Google Sheet append fails after configured retries are exhausted.",
+      "behavior": "Send failure notification to Slack #sales with order ID and error details; do not perform human approval or block further processing of new orders.",
+      "data_changes": null
+    }
+  ],
+  "retry_requirements": [
+    {
+      "system": "Google Sheets",
+      "max_retries": 2,
+      "after_final_failure": "Send Slack notification to #sales with order identifier and failure details."
+    }
+  ],
+  "notification_rules": [
+    {
+      "channel_system": "Slack",
+      "condition": "On every new order event (always)",
+      "event": "order_created_success_path",
+      "audience": "#sales"
+    },
+    {
+      "channel_system": "Slack",
+      "condition": "When Google Sheets write has failed and retries exhausted",
+      "event": "order_write_final_failure",
+      "audience": "#sales"
+    }
+  ],
+  "human_approval": {
+    "required": false,
+    "approval_points": []
+  },
+  "volume": {
+    "estimated_executions": 500,
+    "period": "month",
+    "confidence": "user_stated"
+  },
+  "constraints": {
+    "budget": "null",
+    "technical_skill": "null",
+    "self_hosting_required": false,
+    "security_requirements": [],
+    "compliance_requirements": [],
+    "latency_requirement": "null",
+    "implementation_constraints": {
+      "required_platforms": [],
+      "prohibited_platforms": [],
+      "existing_platforms": [],
+      "platform_preferences": []
+    }
+  },
+  "unknown_requirements": [
+    {
+      "field_path": "data_inputs",
+      "reason": "Specific Shopify order fields (columns) to write into the Google Sheet are not specified (which order properties should be stored as sheet columns).",
+      "blocks_generation": true,
+      "blocks_cost_confidence": false
+    },
+    {
+      "field_path": "systems[Google Sheets].configuration",
+      "reason": "Target Google Sheet file, worksheet name/tab, and exact cell/column mapping are not provided.",
+      "blocks_generation": true,
+      "blocks_cost_confidence": false
+    }
+  ]
+}

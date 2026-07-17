@@ -10,8 +10,10 @@ function slug(s) {
   return String(s || 'automation').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'automation';
 }
 
-// Unified export endpoint (Task 11). POST { platform, version?, part? }
+// Unified export endpoint (Task 11).
+// POST { platform, version?, part?, allow_generic?, allow_historical? }
 //  - platform is REQUIRED — Make/Zapier cannot run without an explicit route.
+//  - a "coming soon" platform returns 409 unless allow_generic=true.
 //  - n8n → JSON { workflow }
 //  - claude/make/zapier → ZIP download (or JSON { prompt } when part='prompt')
 export const POST = withAuth(async (user, request, { params }) => {
@@ -26,6 +28,8 @@ export const POST = withAuth(async (user, request, { params }) => {
     blueprintId: params.id,
     version: body.version ? Number(body.version) : null,
     platform: body.platform,
+    allowGeneric: body.allow_generic === true,
+    allowHistorical: body.allow_historical === true,
   });
 
   if (result.kind === 'workflow') {

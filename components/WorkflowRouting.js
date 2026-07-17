@@ -83,20 +83,24 @@ export default function WorkflowRouting({
     if (key === 'n8n') {
       return { readiness: 'full', enabled: !!canGenerate, live, status: n8nStatus, onClick: onGenerate };
     }
+    // Every export is gated server-side on a COMPLETE, current Blueprint — the
+    // UI mirrors that so a target is never offered when the server would reject it.
+    const notReady = hasBlueprint ? 'Finish the blueprint first' : 'Start a blueprint first';
+
     if (key === 'claude') {
       return {
-        readiness: 'full', enabled: !!hasBlueprint, live: !!hasBlueprint,
-        status: exportingPlatform === 'claude' ? 'Preparing…' : hasBlueprint ? 'Export package' : 'Start a blueprint first',
+        readiness: 'full', enabled: !!canGenerate, live: !!canGenerate,
+        status: exportingPlatform === 'claude' ? 'Preparing…' : canGenerate ? 'Export package' : notReady,
         onClick: () => onExportPlatform?.('claude'),
       };
     }
     if (key === 'make' || key === 'zapier') {
       const r = readiness[key] || 'coming_soon';
-      const enabled = r === 'guide' && !!hasBlueprint;
+      const enabled = r === 'guide' && !!canGenerate;
       const status = exportingPlatform === key
         ? 'Preparing…'
         : r === 'coming_soon' ? 'Coming soon'
-          : hasBlueprint ? 'Guide only' : 'Start a blueprint first';
+          : canGenerate ? 'Guide only' : notReady;
       return { readiness: r, enabled, live: enabled, status, onClick: () => onExportPlatform?.(key) };
     }
     // tools / anything else — not an export platform yet.

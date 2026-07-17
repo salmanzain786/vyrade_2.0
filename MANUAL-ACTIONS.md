@@ -2,7 +2,8 @@
 
 This documents the response to the P0–P2 problem report. Everything marked
 **FIXED** is done, verified, and covered by the build and/or the test suite
-(`npm test`, 25 passing). The **DECISION / MANUAL** items need a human — either a
+(`npm test`, and CI runs it on every push — see the badge/Actions tab rather
+than trusting any hardcoded count in this doc). The **DECISION / MANUAL** items need a human — either a
 product decision (Salman) or infrastructure you must provide.
 
 Run once after pulling: `npm install` then `npm run migrate` (the auth +

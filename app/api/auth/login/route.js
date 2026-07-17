@@ -1,24 +1,23 @@
 import { NextResponse } from 'next/server';
-import { login, AuthError } from '../../../../lib/services/authService.js';
+import { login } from '../../../../lib/services/authService.js';
 import { setSessionCookie } from '../../../../lib/auth/session.js';
+import { withRateLimit } from '../../../../lib/auth/rateLimit.js';
+import { authErrorResponse } from '../../../../lib/auth/routeHelpers.js';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  const body = await request.json().catch(() => ({}));
   try {
-    const body = await request.json();
-    const { userId } = await login(body);
+    // Throttled per email + per IP; every attempt lands in the audit log.
+    const { userId } = await withRateLimit(
+      { request, event: 'login', email: body.email },
+      () => login(body)
+    );
     setSessionCookie(userId);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    if (err instanceof AuthError) {
-      // 403 = email not verified; the UI routes those users to verification.
-      return NextResponse.json(
-        { error: err.message, needsVerification: err.statusCode === 403 },
-        { status: err.statusCode }
-      );
-    }
-    console.error(err);
-    return NextResponse.json({ error: 'Login failed' }, { status: 500 });
+    // 403 = email not verified; the UI routes those users to verification.
+    return authErrorResponse(err, 'Login failed', { needsVerification: err?.statusCode === 403 });
   }
 }

@@ -1,19 +1,23 @@
 import { NextResponse } from 'next/server';
-import { requestPasswordReset, AuthError } from '../../../../lib/services/authService.js';
+import { requestPasswordReset } from '../../../../lib/services/authService.js';
+import { withRateLimit } from '../../../../lib/auth/rateLimit.js';
+import { authErrorResponse } from '../../../../lib/auth/routeHelpers.js';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  const body = await request.json().catch(() => ({}));
   try {
-    const body = await request.json();
-    await requestPasswordReset(body);
-    // Generic response regardless of whether the email exists (no enumeration).
+    // Max 3 reset requests per hour per address, with a 60s cooldown — this
+    // sends mail to a real inbox and the response is deliberately generic, so
+    // without throttling it could be used to mail-bomb someone.
+    await withRateLimit(
+      { request, event: 'forgot_password', email: body.email },
+      () => requestPasswordReset(body)
+    );
+    // Generic regardless of whether the email exists (no enumeration).
     return NextResponse.json({ ok: true, message: 'If an account exists for that email, a reset code is on its way.' });
   } catch (err) {
-    if (err instanceof AuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.statusCode });
-    }
-    console.error(err);
-    return NextResponse.json({ error: 'Could not start password reset' }, { status: 500 });
+    return authErrorResponse(err, 'Could not start password reset');
   }
 }

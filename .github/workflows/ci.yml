@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test & build
+    runs-on: ubuntu-latest
+
+    # Dummy values only. The build's "Collecting page data" step imports every
+    # route module, and lib/config/openai.js constructs the OpenAI client at
+    # import time — so the vars must EXIST, but no network call is made and no
+    # real secret is needed. Tests use the same fallbacks (see tests/setup.js).
+    env:
+      AUTH_SECRET: ci-placeholder-secret-at-least-16-chars
+      OPENAI_API_KEY: ci-placeholder-openai-key
+      OPENAI_MODEL: gpt-4o
+      PINECONE_API_KEY: ci-placeholder-pinecone-key
+      PINECONE_INDEX: ci-index
+      EMBEDDING_MODEL: text-embedding-3-large
+      # No DB is needed: mysql2 creates the pool lazily and nothing connects
+      # during test or build.
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_USER: ci
+      DB_PASSWORD: ''
+      DB_NAME: ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

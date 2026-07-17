@@ -1,0 +1,152 @@
+{
+  "name": "Shopify Order -> Google Sheet append + Slack notification",
+  "business_intent": {
+    "business_goal": "Record every new Shopify order in a Google Sheet and notify the sales team in Slack on failures.",
+    "desired_outcome": "Every new Shopify order is appended as a row in a Google Sheet; if writing to the sheet fails after two retries, the team is alerted on Slack."
+  },
+  "trigger": {
+    "trigger_type": "event",
+    "event": "order_created",
+    "source_system": "Shopify",
+    "schedule": ""
+  },
+  "systems": [
+    {
+      "name": "Shopify",
+      "role": "order source (event producer)",
+      "required": false
+    },
+    {
+      "name": "Google Sheets",
+      "role": "persistent order record (append rows)",
+      "required": false
+    },
+    {
+      "name": "Slack",
+      "role": "notification channel (#sales)",
+      "required": false
+    }
+  ],
+  "data_inputs": [
+    {
+      "field": "order",
+      "required": true,
+      "source": "Shopify"
+    }
+  ],
+  "process_steps": [
+    {
+      "step_id": "receive_shopify_order",
+      "sequence": 1,
+      "action": "Receive new order event from Shopify",
+      "action_type": "receive_data"
+    },
+    {
+      "step_id": "validate_order_payload",
+      "sequence": 2,
+      "action": "Validate that the order payload contains required data for recording and notification (presence of order id and at least one line item)",
+      "action_type": "validate_data"
+    },
+    {
+      "step_id": "transform_to_sheet_row",
+      "sequence": 3,
+      "action": "Map/transform the Shopify order payload into a single sheet row structure",
+      "action_type": "transform_data"
+    },
+    {
+      "step_id": "append_row_to_google_sheet",
+      "sequence": 4,
+      "action": "Append the transformed order row to the Google Sheet (single append operation)",
+      "action_type": "write_data"
+    },
+    {
+      "step_id": "on_append_failure_retry",
+      "sequence": 5,
+      "action": "If the sheet append fails, perform configured retry attempts. If retries remain, retry the append according to retry policy.",
+      "action_type": "wait"
+    },
+    {
+      "step_id": "on_append_final_failure_alert",
+      "sequence": 6,
+      "action": "If all retries are exhausted and the write still fails, send an alert message to the #sales Slack channel describing the failure and relevant order identifiers",
+      "action_type": "notification"
+    }
+  ],
+  "business_rules": [
+    {
+      "rule_id": "br_sheet_write_failure_alert",
+      "description": "If Google Sheet append fails after configured retries, alert the #sales Slack channel.",
+      "condition": {
+        "field": "sheet_append_status",
+        "operator": "equals",
+        "value": [
+          "failed_after_retries"
+        ]
+      },
+      "result": {
+        "action": "post_slack_message",
+        "value": "#sales: post alert with failure details"
+      }
+    }
+  ],
+  "exception_rules": [
+    {
+      "exception_id": "ex_sheet_append_failure",
+      "scenario": "Google Sheet append operation fails and all retry attempts are exhausted.",
+      "behavior": "Send an alert message to the #sales Slack channel containing the order id, timestamp, and error summary. Do not block other order processing.",
+      "data_changes": null
+    }
+  ],
+  "retry_requirements": [
+    {
+      "system": "Google Sheets",
+      "max_retries": 2,
+      "after_final_failure": "Send alert to Slack #sales with failure details"
+    }
+  ],
+  "notification_rules": [
+    {
+      "channel_system": "Slack",
+      "condition": "Google Sheet append fails after retries",
+      "event": "sheet_append_final_failure",
+      "audience": "#sales"
+    }
+  ],
+  "human_approval": {
+    "required": false,
+    "approval_points": []
+  },
+  "volume": {
+    "estimated_executions": 500,
+    "period": "month",
+    "confidence": "user_stated"
+  },
+  "constraints": {
+    "budget": "",
+    "technical_skill": "",
+    "self_hosting_required": false,
+    "security_requirements": [],
+    "compliance_requirements": [],
+    "latency_requirement": "",
+    "implementation_constraints": {
+      "required_platforms": [],
+      "prohibited_platforms": [],
+      "existing_platforms": [],
+      "platform_preferences": []
+    }
+  },
+  "unknown_requirements": [
+    {
+      "field_path": "data_inputs.sheet_column_mapping",
+      "reason": "User did not specify which Shopify order fields (which columns) to write to the Google Sheet or the sheet column order.",
+      "blocks_generation": false,
+      "blocks_cost_confidence": true
+    },
+    {
+      "field_path": "notification.slack_message_template",
+      "reason": "User did not provide the exact Slack message template or required fields to include in the Slack notification.",
+      "blocks_generation": false,
+      "blocks_cost_confidence": true
+    }
+  ]
+}

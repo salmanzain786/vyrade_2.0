@@ -275,11 +275,15 @@ export default function BlueprintSheet({
         />
 
         {blueprintId && (onExportPlatform || onCopyPrompt) && (
-          <div className="mb-3 mt-2 grid grid-cols-2 gap-1.5">
-            <Button variant="ghost" size="sm" onClick={onCopyPrompt} className="h-8 gap-1.5 text-xs">
+          <div
+            className="mb-3 mt-2 grid grid-cols-2 gap-1.5"
+            title={canGenerate ? undefined : 'Available once the blueprint is complete'}
+          >
+            {/* Both go through the same server gate (complete + current blueprint). */}
+            <Button variant="ghost" size="sm" onClick={onCopyPrompt} disabled={!canGenerate} className="h-8 gap-1.5 text-xs">
               <Copy className="h-3.5 w-3.5" /> Copy prompt
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => onExportPlatform?.('claude')} disabled={exportingPlatform === 'claude'} className="h-8 gap-1.5 text-xs">
+            <Button variant="ghost" size="sm" onClick={() => onExportPlatform?.('claude')} disabled={!canGenerate || exportingPlatform === 'claude'} className="h-8 gap-1.5 text-xs">
               <FileCode2 className="h-3.5 w-3.5" />
               {exportingPlatform === 'claude' ? 'Preparing…' : 'Claude package'}
             </Button>

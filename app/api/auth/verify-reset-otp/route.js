@@ -1,19 +1,21 @@
 import { NextResponse } from 'next/server';
-import { verifyResetOtp, AuthError } from '../../../../lib/services/authService.js';
+import { verifyResetOtp } from '../../../../lib/services/authService.js';
+import { withRateLimit } from '../../../../lib/auth/rateLimit.js';
+import { authErrorResponse } from '../../../../lib/auth/routeHelpers.js';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  const body = await request.json().catch(() => ({}));
   try {
-    const body = await request.json();
-    const { resetToken } = await verifyResetOtp(body);
+    // Same OTP-guessing cap as email verification.
+    const { resetToken } = await withRateLimit(
+      { request, event: 'verify_reset_otp', email: body.email },
+      () => verifyResetOtp(body)
+    );
     // The reset token authorizes the final password change.
     return NextResponse.json({ ok: true, resetToken });
   } catch (err) {
-    if (err instanceof AuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.statusCode });
-    }
-    console.error(err);
-    return NextResponse.json({ error: 'Could not verify code' }, { status: 500 });
+    return authErrorResponse(err, 'Could not verify code');
   }
 }
