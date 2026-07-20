@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "migrate": "node scripts/migrate.js",
+    "cleanup:auth-audit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/cleanup-auth-audit.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

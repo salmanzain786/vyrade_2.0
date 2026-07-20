@@ -1,86 +1,124 @@
-# Blueprint review — fixes applied & what needs you
+# Review response — what's fixed, and what still needs you
 
-This documents the response to the P0–P2 problem report. Everything marked
-**FIXED** is done, verified, and covered by the build and/or the test suite
-(`npm test`, and CI runs it on every push — see the badge/Actions tab rather
-than trusting any hardcoded count in this doc). The **DECISION / MANUAL** items need a human — either a
-product decision (Salman) or infrastructure you must provide.
+Response to the P0–P2 review rounds. Everything under **Fixed in code** is done,
+verified live, and covered by the test suite + CI. The **Decisions / manual
+actions** at the bottom need a human — a product decision or infrastructure only
+you can provide.
 
-Run once after pulling: `npm install` then `npm run migrate` (the auth +
-blueprint changes are already migrated on this machine).
+> Don't trust counts in this file. `npm test` and `npm run build` run in CI on
+> every push — check the Actions tab for the authoritative result.
+
+Run once after pulling: `npm install` → `npm run migrate`.
 
 ---
 
 ## Fixed in code
 
-| # | Problem | Fix | Where |
-|---|---------|-----|-------|
-| P0‑1 | Patch missing the question context | The patch engine now receives the **question Vyrade asked + the user's answer**, retrieved **server‑side** from the conversation store (client is never trusted to build it). | `blueprintService.patchFromClarification`, `conversationRepository.getLastAssistantQuestion`, `blueprintGenerator.patchBlueprintContent` |
-| P0‑2 | Backend let incomplete blueprints generate workflows | `generateWorkflow` now re‑derives readiness and **throws `BlueprintNotReadyError` (409)** unless `requirements_complete`, **before** calling the n8n specialist. Verified live: incomplete blueprint → 409. | `blueprintService.generateWorkflow`, `blueprintErrors.js` |
-| P0‑2b | Generating from a non‑current version | Generation is restricted to the **current** version (`StaleVersionError`, 409). Historical‑version generation is intentionally **not** offered (see Decisions). | same |
-| P0‑3 | Old workflows look current after Blueprint changes | Workflows are matched to the version they were generated from; the conversation API returns `workflowMeta { generated_from_version, current_blueprint_version, is_stale }` and the UI shows a **"Workflow outdated — regenerate"** banner. | `blueprintRepository.getLatestWorkflowRecord` / `getWorkflowForBlueprintVersion`, `workflowStatus.isWorkflowStale`, conversation route, `BlueprintSheet`, `ChatWorkspace` |
-| P0‑4 | Historical version returned the *current* status | `formatBlueprintRow` now derives status from **that version's own readiness snapshot** (`readinessJson.status`) and adds `is_current` / `current_version`. Verified live. | `blueprintRepository.formatBlueprintRow` |
-| P1‑7 | Inconsistent BLOCKED events | Lifecycle events now **match the persisted status** — `emitStatusEvent` only emits `blueprint.completed` when complete and never emits a spurious `blueprint.blocked` while the row is `collecting_requirements`. (See the revised note below on how "blocked" is surfaced.) | `blueprintService.emitStatusEvent`, `readiness.checkReadiness` |
-| P1‑8 | Human‑approval clarification loop (MUST‑ASK + DO‑NOT‑ASK‑AGAIN) | The interview forces a **streamed** question only while a *structural* must‑have is missing; once those are in place it may finish, so it keeps asking about underspecified details but is no longer forced to re‑ask a point the user already declined. Missing details are always surfaced as **plain‑English questions**, never raw field paths. | `readiness`, `clarificationAgent.prepareQuestion` |
-| P2 | Neutrality validator too blunt for platform lock‑in | New `constraints.implementation_constraints` ({required/prohibited/existing/preferred}_platforms) preserves "we must stay on n8n" as a **user constraint**; neutrality scan **exempts that subtree** but still bans platform terms everywhere else. | `blueprintSchema.js`, generator system prompt |
-| P2 | n8n validator didn't prove importability | Validator now enforces numeric `typeVersion`, `position` = `[x,y]` numbers, `parameters` is an object, and **exactly one** trigger — matching the specialist's own prompt. | `n8nSpecialist.validateWorkflow` |
-| P1‑6 | No automated tests | Added **vitest** suite (`tests/`, 25 tests): contradictory rules, referential/sequence, unknown volume, blocked/loop, neutrality + implementation_constraints, n8n structural validation, workflow staleness, 409 gate errors. Run `npm test`. | `tests/`, `vitest.config.js` |
+### Blueprint engine
+| Problem | Fix |
+|---|---|
+| Patch missing the question context | The patch engine receives the **question Vyrade asked + the user's answer**, retrieved **server-side** from the conversation store (the client is never trusted to build it), so "Only on failures" / "Sarah" land on the right field. |
+| Incomplete blueprints could generate workflows | A **shared gate** re-derives readiness and throws `BlueprintNotReadyError` (409) unless `requirements_complete` — **before** any LLM call. |
+| Generating from a superseded version | Restricted to the **current** version (`StaleVersionError`, 409). |
+| Historical version returned the *current* status | Status now comes from **that version's own readiness snapshot**, plus `is_current` / `current_version`. |
+| Stale workflows looked current | Workflows are matched to the version they were generated from; the API returns `is_stale` and the UI shows a "Workflow outdated — regenerate" banner. |
+| Inconsistent `blueprint.blocked` events | Lifecycle events now match the persisted status; no spurious BLOCKED while `collecting_requirements`. |
+| Human-approval clarification loop | A question is forced only while a *structural* must-have is missing; afterwards the agent may finish instead of re-asking a declined point. Missing details are surfaced as **plain-English questions**, never raw field paths. |
+| Neutrality validator too blunt | `constraints.implementation_constraints` preserves "we must stay on n8n" as a **user constraint**; the neutrality scan exempts that subtree only. |
+| n8n validator didn't prove importability | Enforces numeric `typeVersion`, `[x,y]` positions, object `parameters`, exactly one trigger, full wiring — with a bounded repair loop. |
 
-### Notes on the fixes
-- **DB:** `constraints.implementation_constraints` is now required by the schema, so **new** generations/patches always include it. Blueprints created before this change are read as‑is (not re‑validated) and won't crash the sheet; the field is filled the next time the model patches them.
-- **On "blocked" (revised from the first pass):** the first version derived `blocked` from Blueprint content, which caused a real regression — the model records `unknown_requirements` for anything *underspecified* (not just things the user declined), so the agent stopped asking and dumped raw field paths (`systems.Spreadsheet.location_and_access`, …). Corrected: **every open item is asked in plain language**; whether something is truly unresolvable is a conversational judgment left to the clarification agent, not guessed from content. So content status is now `collecting_requirements` / `requirements_complete` only, and "still needed" items are shown as friendly questions. A distinct persisted `blocked` status (set when the agent ends the interview with items the user genuinely can't provide) is a small follow‑up if you want the red BLOCKED stamp back — say the word.
+### Retrieval (the moat)
+| Problem | Fix |
+|---|---|
+| Generation was "node docs + LLM" | n8n generation now grounds in **three isolated sources**: **workflow examples** (real workflows as structural templates — Pinecone → `mysql_id` → `WORKFLOW_JSON` hydrated from MySQL and compacted to a skeleton), **n8n node knowledge**, and **Vyrade tools + API docs** (wired as `httpRequest` nodes). Examples are placed first; the Blueprint always wins on conflict. |
+| Make/Zapier had no path | Foundation built on a **shared exporter interface** — no duplicated engine. Each platform uses its **own isolated index**, so platform docs can't bleed into the n8n or Claude routes. |
+
+### Exports
+| Problem | Fix |
+|---|---|
+| Claude/Make/Zapier bypassed the readiness gate | **All** platforms go through the same gate (complete + current, or 409). The old ungated `/claude-export` route was deleted. |
+| Zapier "Coming soon" in UI but the API still produced a guide | One rule: `coming_soon` → **409**, unless the caller explicitly passes `allow_generic=true`. UI and API can no longer disagree. |
+| Claude package incomplete | Now 14 files incl. `CLAUDE.md` (auto-loaded project memory), `.mcp.json.example`, `MCP_SETUP.md`, `security-notes.md`, `manual-approval-rules.md`, with **read/write guardrails** (draft before writing/posting, browser read-only, never request credentials in chat). |
+| No fake JSON for unsupported platforms | Make/Zapier emit **honest implementation guides** grounded in their own catalogs — never a hallucinated scenario/Zap file, and no n8n node names. |
+
+### Security
+| Problem | Fix |
+|---|---|
+| MCP config could leak catalog secrets | `sanitizeMcpConfig` is **fully recursive** over the whole server config (any depth, objects + arrays), redacting by key name *and* value shape, with a depth cap. Unparseable config is dropped rather than rendered raw. |
+| Raw user input reached the LLM/DB unredacted | **Pre-LLM redaction** at all 5 entry points — provider tokens, JWTs, `Bearer`/`Basic`, PEM keys, Slack webhooks, DB/SMTP URL passwords, generic `password:`/`api_key=`. Applied **before the model and before persistence**; originals are never stored. |
+| Weak OTP hashing | OTPs are **HMAC-SHA256 keyed with `AUTH_SECRET`** (not plain SHA-256) with constant-time compare — a DB-only leak no longer reverses a 6-digit code. |
+| No auth rate limiting | Per-email + per-IP windows, resend/reset cooldowns, hourly reset caps on **all 7** auth endpoints → `429` + `Retry-After`, backed by an `auth_attempts` **audit log**. |
+| `X-Forwarded-For` was blindly trusted | XFF is **ignored unless `TRUST_PROXY`** declares how many proxies sit in front; the client IP is then read N entries **from the right** so a spoofed left-hand value is discarded. Platform headers (Cloudflare/Vercel) are always honoured. |
+| Audit table grew forever | Two-tier retention: full detail → **PII stripped at 30d** → **deleted at 90d** (batched). Prunes opportunistically in-app (max hourly) plus `npm run cleanup:auth-audit` for cron. |
+
+### Tests & CI
+| Problem | Fix |
+|---|---|
+| No CI — "N passing" was an unverifiable claim | **GitHub Actions** runs `npm ci → npm test → npm run build` on every push/PR (`.github/workflows/ci.yml`), with CI-safe dummy env. |
+| LLM-dependent cases untested | **Recorded-LLM replay tests**: real OpenAI responses captured once into `tests/fixtures/llm/`, replayed offline with the client mocked. Covers *retry twice → 2*, *change to five → 5*, *"only on failures"*, equivalent phrasings, and invalid-output repair. Re-record with `RECORD_LLM=1 npx vitest run tests/_record.test.js`. |
 
 ---
 
 ## Decisions / manual actions needed
 
-### 1. (P0/P1‑5) Standalone app vs. integration into existing Vyrade — **your call, blocks direction**
-This repo is a self‑contained Next.js app (own chat UI, Blueprint sheet, MySQL,
-API). Your spec meant **existing chat → existing clarification → NEW Blueprint
-layer → existing/updated RAG → generation**, i.e. add a Blueprint *layer* to the
-current product, not build a parallel product.
+### 1. Standalone app vs. integration into existing Vyrade — **your call**
+This repo is a self-contained Next.js app (own chat UI, Blueprint panel, MySQL,
+API). The spec described adding a Blueprint **layer** to the existing product,
+not a parallel product. I have not restructured toward either, because it
+changes where every module lives. Tell me the target and I'll produce the
+integration plan.
 
-**Nothing further should be built on top of this until you decide:** POC to be
-merged into the current backend, or a rebuild. I did not restructure toward
-either, because it changes where every module should live. Tell me the target
-and I'll produce the integration plan (which pieces move into the existing
-chat/backend, which stay).
+### 2. Real n8n import smoke test — **built; needs your instance to switch on**
+The full pipeline is implemented and tested (against a mocked n8n):
 
-### 2. (P1‑9) n8n generation uses only the node DB — **needs your data sources**
-Current generation = Blueprint + **Pinecone n8n node knowledge** only. Your moat
-also has **workflow‑example DB, tool DB, and API docs**. Wiring those into the
-retrieval router is an enhancement I can build, but it needs:
-- access/credentials + index names for the workflow‑example, tool, and API‑doc stores;
-- confirmation of the retrieval order you want (workflow examples → nodes → tools → API docs).
+```
+generate → import into test n8n → reject? repair with n8n's own error
+                                → accept? mark export verified
+```
 
-Until then generation is intentionally node‑only — it does **not** replace the
-richer retrieval, it just doesn't use sources this repo can't reach yet.
+It is **inactive until you provide a throwaway instance**:
 
-### 3. (P2) Real n8n import smoke test — **needs a controlled n8n instance**
-`validateWorkflow` now checks structure/importability heuristics, but the gold
-standard is a **test import against a real n8n**. To add that I need a throwaway
-n8n URL + API key (ideally in CI). Give me those and I'll add a
-generate → import → PASS/REPAIR step.
+```bash
+N8N_TEST_URL=https://n8n-test.internal
+N8N_TEST_API_KEY=n8n_api_...
+```
 
-### 4. LLM‑dependent QA cases — **can't be deterministically unit‑tested**
-Cases like "retry twice → `retries = 2`", "change to five → `retries = 5`",
-invalid‑JSON repair, and equivalent‑wording all depend on the model. The
-deterministic logic around them **is** tested; the model behavior itself should
-be covered by **integration tests with recorded/mocked LLM responses**. I can add
-that harness (records a fixture on first run, replays after) if you want it —
-it's the right way to lock these without paying per test run.
+Use a disposable instance, never production — each check creates and then
+deletes a workflow. Add the same two values as CI secrets to run the check on
+every push. Result is stamped on `workflow.meta.import_check`
+(`verified` / `failed` / `skipped`) and badged in the workflow modal.
 
-### 5. Historical‑version workflow generation — **intentionally not built**
-Per the report's recommendation, generation is **current‑version‑only**.
-Generating a workflow from an old version would be a separate, explicit action.
-Say the word if you want that surfaced in the UI.
+### 3. Make CI a required check — **GitHub setting, not code**
+The workflow exists but must be enforced:
+**Settings → Branches → protect `main` → Require status checks → `test & build`.**
+
+### 4. Workflow-example coverage — **pending your data migration**
+Retrieval is wired and live, but the Pinecone index references more rows than
+`vyrade_blueprint.n8n_node_workflows` currently holds (~36% of matches hydrate
+today). Retrieval **over-fetches and skips** what it can't hydrate, so coverage
+improves automatically once you migrate the full data — **no code change**.
+`WORKFLOW_EXAMPLE_DB` / `WORKFLOW_EXAMPLE_TABLE` can re-point the source.
+
+### 5. Operational insights — **not yet a source**
+The remaining moat layer (run/failure telemetry feeding generation) has no index
+or data source yet. Point me at one and it slots in beside the other three.
+
+### 6. Historical-version export — **built, deliberately not exposed**
+Exports are current-version-only. The service accepts `allowHistorical` (and the
+route `allow_historical`), but no UI surfaces it. Say the word if you want it.
+
+### 7. Production config you must set
+- Real **SMTP** — otherwise OTP codes only print to the server console.
+- **`TRUST_PROXY`** to match your deployment, or per-IP limits stay inactive.
+- Real **token pricing** (`OPENAI_PRICE_*` or the table in `lib/config/pricing.js`).
+- Confirm each Pinecone index's **embedding model** matches how it was built.
 
 ---
 
 ## How to verify
 ```bash
-npm test          # 25 deterministic tests
-npm run build     # full compile of every route + middleware
-npm run dev       # manual: create vague blueprint → generate → 409; complete → generate ok
+npm test                    # deterministic: no network, no DB
+npm run build               # compiles every route + middleware
+npm run cleanup:auth-audit  # applies the audit retention policy
+npm run dev                 # manual: incomplete blueprint → export → 409; complete → ok
 ```
-Live‑verified this round: P0‑2 (409 gate, no n8n call), P0‑4 (per‑version status).

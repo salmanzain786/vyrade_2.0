@@ -3,6 +3,7 @@ import { patchFromClarification } from '../../../../lib/services/blueprintServic
 import { getLatest } from '../../../../lib/services/blueprintRepository.js';
 import { withAuth } from '../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../lib/auth/ownership.js';
+import { redactForLlm } from '../../../../lib/security/redact.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +30,8 @@ export const PATCH = withAuth(async (user, request, { params }) => {
   const result = await patchFromClarification({
     blueprintId: params.id,
     expectedVersion: Number(expected_version),
-    newUserTurn: new_user_turn,
+    // Strip pasted credentials before this answer reaches the model.
+    newUserTurn: redactForLlm(new_user_turn, 'blueprint.patch'),
     changeReason: change_reason,
     sourceTurnId: source_turn_id,
   });

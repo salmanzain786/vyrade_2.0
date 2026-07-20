@@ -64,9 +64,7 @@ describe('P1 — rate-limit policy', () => {
     expect(e.retryAfter).toBe(42);
   });
 
-  it('clientIp prefers the first x-forwarded-for entry', () => {
-    const req = { headers: { get: (k) => (k === 'x-forwarded-for' ? '203.0.113.9, 10.0.0.1' : null) } };
-    expect(clientIp(req)).toBe('203.0.113.9');
+  it('clientIp returns unknown when there is no trusted source', () => {
     expect(clientIp({ headers: { get: () => null } })).toBe('unknown');
   });
 });

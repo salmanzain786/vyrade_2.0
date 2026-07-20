@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createInitialBlueprint } from '../../../lib/services/blueprintService.js';
 import { withAuth } from '../../../lib/auth/guard.js';
 import { assertSessionAccess } from '../../../lib/auth/ownership.js';
+import { redactForLlm } from '../../../lib/security/redact.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,8 @@ export const POST = withAuth(async (user, request) => {
   const result = await createInitialBlueprint({
     sessionId: session_id,
     userId: user.id,
-    conversationText: conversation_text,
+    // Strip pasted credentials before this text reaches the model.
+    conversationText: redactForLlm(conversation_text, 'blueprint.create'),
     sourceTurnId: source_turn_id,
   });
 

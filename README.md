@@ -87,6 +87,22 @@ platform with no index is *Coming soon* (409) unless the API is called with
   `typeVersion`, `[x,y]` positions, object `parameters`, and fully-wired
   connections, with a bounded repair loop. Stale detection flags a workflow when
   the Blueprint has since changed.
+
+  **Real-import smoke test** — structure is only a proxy for importability, so
+  when `N8N_TEST_URL` + `N8N_TEST_API_KEY` point at a **throwaway** n8n instance
+  the pipeline becomes:
+
+  ```
+  generate → import into test n8n → reject? repair using n8n's own error
+                                  → accept? mark export verified
+  ```
+
+  The smoke-test workflow is deleted afterwards. Results are stamped on
+  `workflow.meta.import_check` (`verified` / `failed` / `skipped`) and shown as a
+  badge in the workflow modal. If the instance is unreachable the check is
+  *skipped* (never a failure), and a workflow n8n keeps rejecting is still
+  returned — clearly marked **unverified** — so a strict or flaky test box can't
+  block a user.
 - **Claude Code package** (`lib/services/claudeExporter.js`) — a ZIP of markdown,
   **not** a workflow file, because Claude Code isn't a workflow engine. Includes
   `README.md`, `CLAUDE.md` (auto-loaded project memory), `architecture.md`,
@@ -108,12 +124,23 @@ platform with no index is *Coming soon* (409) unless the API is called with
 The n8n Specialist grounds generation in **isolated** Pinecone indexes so one
 platform's docs never bleed into another's route:
 
+- **Workflow examples** — real n8n workflows that solved a similar problem, used
+  as *structural templates* (what shape the graph takes, which node types
+  experienced builders pick). Two-stage: Pinecone returns `metadata.mysql_id`,
+  then `WORKFLOW_JSON` is hydrated from MySQL and **compacted to a skeleton**
+  (node names/types + wiring). Parameters and credentials are deliberately
+  stripped, so nothing from an example leaks into your workflow.
 - **n8n node knowledge** — real nodes with exact `type` / `typeVersion` / `parameters`.
 - **Vyrade tools + API docs** — when a relevant tool has no first-class node, it's wired as an `httpRequest` node from the documented endpoint/auth (secrets as placeholders).
 
+Examples come first in the prompt (structure should inform node choice, not the
+reverse), and the Blueprint always wins where they disagree. Retrieval
+over-fetches and skips any match this database can't hydrate, so coverage
+improves automatically as workflow data is migrated in — and generation still
+works if the index is unset.
+
 Make, Zapier, and MCP each have their own isolated indexes used only by their
-own exporter. *(Workflow-example retrieval — full example workflows as
-structural templates — is the next planned source and not yet wired in.)*
+own exporter. *(Operational insights are the next planned source.)*
 
 ---
 
@@ -137,7 +164,60 @@ Cost is computed server-side from the model + token counts.
 - **Rate limiting** on all seven auth endpoints — per-email + per-IP windows,
   resend/reset cooldowns, hourly reset caps — backed by an `auth_attempts` table
   that doubles as an **audit log**. Over-limit requests get `429` + `Retry-After`.
+
+### Deployment assumption: trusted proxy (`TRUST_PROXY`)
+
+Per-IP rate limiting is only as trustworthy as the client IP. `X-Forwarded-For`
+is **client-supplied** unless a proxy you control appends to it, so a directly
+exposed app that trusted it could be bypassed by rotating the header. Therefore:
+
+| Setup | Setting | Client IP source |
+|---|---|---|
+| Directly exposed (no proxy) | leave unset | socket/platform only; **XFF ignored** |
+| Behind one proxy (Nginx, ALB, Cloudflare, Vercel) | `TRUST_PROXY=1` | rightmost XFF entry |
+| Behind two (e.g. Cloudflare → Nginx) | `TRUST_PROXY=2` | 2nd entry from the right |
+
+With `N` trusted proxies the client IP is read `N` entries **from the right**,
+because each proxy appends the peer it received from — so a spoofed value on the
+left is discarded. Platform headers (`CF-Connecting-IP`, Vercel, `True-Client-IP`)
+are always honoured since the edge overwrites whatever the client sent.
+
+If self-hosting, make sure your proxy actually sets these — e.g. Nginx:
+`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`
+
+If no trusted IP can be resolved, per-IP limits are **skipped** (rather than
+lumping every request into one shared bucket, which would let one abuser lock
+out everyone) and a warning is logged — per-email limits still apply.
+
+### Audit retention
+
+`auth_attempts` stores email + IP, so it is pruned in two tiers rather than
+growing forever (rate limiting only needs the last ~60 minutes; the rest is for
+incident investigation):
+
+| Age | What is kept |
+|---|---|
+| ≤ `AUTH_AUDIT_ANONYMIZE_AFTER_DAYS` (default **30d**) | full detail |
+| ≤ `AUTH_AUDIT_RETAIN_DAYS` (default **90d**) | **email/IP stripped**; event, outcome and timestamp retained for trend analysis |
+| older | deleted (in batches, so no long table lock) |
+
+The app prunes opportunistically in the background (at most once an hour), so a
+deployment with no cron still stays bounded. For a deterministic schedule:
+
+```bash
+npm run cleanup:auth-audit                      # honours the env defaults
+npm run cleanup:auth-audit -- --retain=60       # or override per run
+# cron: 0 3 * * * cd /path/to/app && npm run cleanup:auth-audit
+```
 - **Ownership** is enforced on every conversation and blueprint route.
+- **Secret redaction on user input** (`lib/security/redact.js`) — every piece of
+  user text is scrubbed at the API boundary **before it reaches OpenAI and
+  before it is persisted**. Covers provider tokens (OpenAI, Anthropic, GitHub,
+  GitLab, Slack, Shopify, Stripe, AWS, Google, Pinecone, SendGrid, npm),
+  JWTs, `Bearer`/`Basic` headers, PEM private keys, Slack webhooks, credentials
+  embedded in database/SMTP URLs, and generic `password:`/`api_key=` assignments.
+  Values are replaced with `[REDACTED_<TYPE>]`; the original is **never stored**
+  (a Blueprint is a requirements document and never needs a live credential).
 
 ---
 
@@ -170,6 +250,5 @@ on `main`.
 - Set real **SMTP** so verification/reset emails send (otherwise codes only
   print to the server console).
 - Point the token **pricing** table / env at your real rates.
-- Redact secrets from raw user input before it reaches the LLM.
 - Confirm the Pinecone **embedding model** matches how each index was built.
 - See `MANUAL-ACTIONS.md` for the running list of decisions/manual steps.

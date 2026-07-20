@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Copy, Check, Download, Eye, Code2 } from 'lucide-react';
+import { Copy, Check, Download, Eye, Code2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -71,6 +71,8 @@ export default function N8nWorkflow({ workflow, height = '100%' }) {
   }
 
   const nodeCount = Array.isArray(workflow?.nodes) ? workflow.nodes.length : 0;
+  // 'verified' | 'failed' | 'skipped' (no test instance configured)
+  const importCheck = workflow?.meta?.import_check;
 
   return (
     <div style={{ height }} className="flex flex-col overflow-hidden bg-sidebar">
@@ -107,6 +109,24 @@ export default function N8nWorkflow({ workflow, height = '100%' }) {
           </button>
           <span className="px-2 text-xs text-muted-foreground">{nodeCount} nodes</span>
         </div>
+
+        {/* Did a real n8n instance accept this import? */}
+        {importCheck === 'verified' && (
+          <span
+            title="A real n8n instance accepted this workflow on import"
+            className="hidden items-center gap-1.5 rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-500 sm:inline-flex"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" /> Import verified
+          </span>
+        )}
+        {importCheck === 'failed' && (
+          <span
+            title={workflow?.meta?.import_error || 'n8n rejected this workflow on import'}
+            className="hidden items-center gap-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-500 sm:inline-flex"
+          >
+            <ShieldAlert className="h-3.5 w-3.5" /> Import unverified
+          </span>
+        )}
 
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleCopy}>

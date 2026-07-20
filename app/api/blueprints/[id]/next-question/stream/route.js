@@ -5,6 +5,7 @@ import { addMessage, addConversationUsage } from '../../../../../../lib/services
 import { mergeUsage, usageFromCompletion, emptyUsage } from '../../../../../../lib/config/pricing.js';
 import { withAuth } from '../../../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../../../lib/auth/ownership.js';
+import { redactForLlm } from '../../../../../../lib/security/redact.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,9 @@ export const POST = withAuth(async (user, request, { params }) => {
     const sessionId = current.session_id;
     const bpUsage = blueprint_usage || emptyUsage(MODEL);
 
-    const prep = prepareQuestion(current.blueprint, conversation_so_far || '');
+    // The client sends the running transcript — redact before it reaches the model.
+    const safeTranscript = redactForLlm(conversation_so_far || '', 'next-question.stream');
+    const prep = prepareQuestion(current.blueprint, safeTranscript);
 
     // Interview already complete — no model call. Still record the blueprint
     // usage this turn cost (no agent message to hang it on).

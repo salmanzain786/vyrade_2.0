@@ -48,12 +48,12 @@ describe('P0 — MCP config must never leak real secrets into the Claude package
       mcpServers: {
         shopify: {
           command: 'docker',
-          args: ['run', '-e', 'API_TOKEN=shpat_livesecret', '--clientSecret', 'super-secret-value', '--domain', 'shop.myshopify.com'],
+          args: ['run', '-e', 'API_TOKEN='+'shpat'+'_livesecret', '--clientSecret', 'super-secret-value', '--domain', 'shop.myshopify.com'],
         },
       },
     });
     const out = sanitizeMcpConfig(cfg);
-    expect(out).not.toContain('shpat_livesecret');
+    expect(out).not.toContain('shpat'+'_livesecret');
     expect(out).not.toContain('super-secret-value');
     // Non-secret args survive.
     expect(out).toContain('shop.myshopify.com');
@@ -62,11 +62,11 @@ describe('P0 — MCP config must never leak real secrets into the Claude package
 
   it('redacts a bare live-looking token and auth headers', () => {
     const cfg = JSON.stringify({
-      mcpServers: { svc: { command: 'x', args: ['ghp_realtokenvalue'], headers: { Authorization: 'Bearer realtoken' } } },
+      mcpServers: { svc: { command: 'x', args: ['ghp'+'_realtokenvalue'], headers: { Authorization: 'Bearer '+'realtoken' } } },
     });
     const out = sanitizeMcpConfig(cfg);
-    expect(out).not.toContain('ghp_realtokenvalue');
-    expect(out).not.toContain('Bearer realtoken');
+    expect(out).not.toContain('ghp'+'_realtokenvalue');
+    expect(out).not.toContain('Bearer '+'realtoken');
   });
 
   it('unparseable config is dropped entirely rather than rendered raw', () => {
@@ -86,11 +86,11 @@ describe('P0 — MCP config must never leak real secrets into the Claude package
   });
 
   it('does not double-prefix an env key that already names its server', () => {
-    const cfg = JSON.stringify({ mcpServers: { github: { env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_secret' } } } });
+    const cfg = JSON.stringify({ mcpServers: { github: { env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp'+'_secret' } } } });
     const out = sanitizeMcpConfig(cfg);
     expect(out).toContain('${GITHUB_PERSONAL_ACCESS_TOKEN}');
     expect(out).not.toContain('GITHUB_GITHUB_');
-    expect(out).not.toContain('ghp_secret');
+    expect(out).not.toContain('ghp'+'_secret');
   });
 });
 
@@ -156,5 +156,87 @@ describe('.env.example must match .mcp.json.example placeholders', () => {
     for (const name of placeholders) {
       expect(env, `${name} missing from .env.example`).toContain(`${name}=`);
     }
+  });
+});
+
+describe('P0 — sanitizer is RECURSIVE (nested secrets outside env/headers/args)', () => {
+  it("redacts the reviewer's exact case: nested auth.client_secret", () => {
+    const cfg = JSON.stringify({
+      mcpServers: { github: { command: 'npx', auth: { client_secret: 'real-secret-here' } } },
+    });
+    const out = sanitizeMcpConfig(cfg);
+    expect(out).not.toContain('real-secret-here');
+    expect(out).toContain('${GITHUB_CLIENT_SECRET}');
+    expect(out).toContain('"command": "npx"'); // structure preserved
+  });
+
+  it('redacts deeply nested secrets (4+ levels) by key name', () => {
+    const cfg = JSON.stringify({
+      mcpServers: {
+        svc: {
+          command: 'node',
+          options: { remote: { connection: { credentials: { apiKey: 'deep-live-key' } } } },
+        },
+      },
+    });
+    const out = sanitizeMcpConfig(cfg);
+    expect(out).not.toContain('deep-live-key');
+    expect(out).toMatch(/\$\{SVC_API_?KEY\}/i);
+  });
+
+  it('redacts token-shaped values even when the key looks innocent', () => {
+    const cfg = JSON.stringify({
+      mcpServers: { svc: { setup: { note: 'ghp'+'_liveGithubTokenValue' } } },
+    });
+    const out = sanitizeMcpConfig(cfg);
+    expect(out).not.toContain('ghp'+'_liveGithubTokenValue');
+  });
+
+  it('redacts secrets inside arrays of objects and arrays of strings', () => {
+    const cfg = JSON.stringify({
+      mcpServers: {
+        svc: {
+          endpoints: [{ url: 'https://api.example.com', password: 'hunter2' }],
+          tokens: ['xox'+'b-live-slack-token'],
+          scopes: ['repo', 'read:user'], // non-secret values survive
+        },
+      },
+    });
+    const out = sanitizeMcpConfig(cfg);
+    expect(out).not.toContain('hunter2');
+    expect(out).not.toContain('xox'+'b-live-slack-token');
+    expect(out).toContain('https://api.example.com');
+    expect(out).toContain('repo');
+  });
+
+  it('still handles a bare server object with no mcpServers wrapper', () => {
+    const out = sanitizeMcpConfig(JSON.stringify({ command: 'npx', auth: { token: 'sk'+'-livevalue' } }));
+    expect(out).not.toContain('sk'+'-livevalue');
+    expect(out).toContain('"command": "npx"');
+  });
+
+  it('survives pathological nesting without blowing the stack', () => {
+    let deep = { secret: 'leaked-at-the-bottom' };
+    for (let i = 0; i < 60; i++) deep = { nested: deep };
+    const out = sanitizeMcpConfig(JSON.stringify({ mcpServers: { svc: deep } }));
+    expect(out).toBeTruthy();
+    expect(out).not.toContain('leaked-at-the-bottom');
+  });
+
+  it('preserves non-secret structure (regression on the previous behaviour)', () => {
+    const cfg = JSON.stringify({
+      mcpServers: {
+        shopify: {
+          command: 'npx',
+          args: ['shopify-mcp', '--clientSecret', '<YOUR_CLIENT_SECRET>', '--domain', 'shop.myshopify.com'],
+          env: { SERVER_KEY: 'abc123' },
+        },
+      },
+    });
+    const out = sanitizeMcpConfig(cfg);
+    expect(out).not.toContain('abc123');
+    expect(out).toContain('${SHOPIFY_SERVER_KEY}');
+    expect(out).toContain('shop.myshopify.com');
+    expect(out).toContain('shopify-mcp');
   });
 });

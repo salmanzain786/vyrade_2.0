@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getNextQuestion } from '../../../../../lib/services/blueprintService.js';
 import { withAuth } from '../../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
+import { redactForLlm } from '../../../../../lib/security/redact.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,7 @@ export const POST = withAuth(async (user, request, { params }) => {
   const result = await getNextQuestion({
     blueprintId: params.id,
     version: Number(version),
-    conversationSoFar: conversation_so_far || '',
+    conversationSoFar: redactForLlm(conversation_so_far || '', 'next-question'),
   });
   return NextResponse.json({ question: result.text, done: result.done, usage: result.usage });
 });
