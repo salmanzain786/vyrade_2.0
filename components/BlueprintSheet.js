@@ -1,7 +1,9 @@
 'use client';
 
-import { Loader2, Copy, Download, FileCode2 } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, Copy, Download, FileCode2, Lock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ExportPlatformModal from '@/components/ExportPlatformModal';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -112,7 +114,12 @@ export default function BlueprintSheet({
   onExportPlatform, onCopyPrompt, exportingPlatform, platformReadiness,
 }) {
   const bp = blueprint;
-  const canGenerate = readiness?.status === 'requirements_complete' && !generating;
+  const [exportOpen, setExportOpen] = useState(false);
+  // Gate on the readiness STATUS, not a literal 100% score: the score can sit
+  // below 100 with non-blocking unknowns while the server-side export gate still
+  // passes. The not-ready label shows the score purely as information.
+  const ready = readiness?.status === 'requirements_complete';
+  const canGenerate = ready && !generating;
   const shortId = blueprintId ? blueprintId.slice(0, 8) : '————————';
   const hasOpenItems = !!bp?.unknown_requirements?.length;
 
@@ -250,6 +257,39 @@ export default function BlueprintSheet({
       */}
       <div className="scrollbar-thin max-h-[58%] shrink-0 overflow-y-auto border-t-2 border-primary/40 bg-background/70 px-5 py-4 backdrop-blur lg:max-h-none lg:overflow-visible">
         <ReadinessMeter readiness={readiness} />
+
+        {/*
+          The primary call to action. Disabled until the Blueprint is complete —
+          and it says so, rather than failing at the server gate.
+        */}
+        <Button
+          size="lg"
+          onClick={() => setExportOpen(true)}
+          disabled={!canGenerate}
+          className="mb-3 h-11 w-full gap-2 text-[13px] font-semibold"
+        >
+          {canGenerate ? (
+            <>
+              <Sparkles className="h-4 w-4" />
+              Click here to generate workflow
+            </>
+          ) : (
+            <>
+              <Lock className="h-3.5 w-3.5" />
+              Blueprint not ready yet{readiness ? ` — ${readiness.score ?? 0}%` : ''}
+            </>
+          )}
+        </Button>
+
+        <ExportPlatformModal
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          platformReadiness={platformReadiness}
+          onGenerate={onGenerate}
+          onExportPlatform={onExportPlatform}
+          generating={generating}
+          exportingPlatform={exportingPlatform}
+        />
 
         {workflow && workflowStale && (
           <div
