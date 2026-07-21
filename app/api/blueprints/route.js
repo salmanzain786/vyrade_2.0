@@ -3,6 +3,8 @@ import { createInitialBlueprint } from '../../../lib/services/blueprintService.j
 import { withAuth } from '../../../lib/auth/guard.js';
 import { assertSessionAccess } from '../../../lib/auth/ownership.js';
 import { redactForLlm } from '../../../lib/security/redact.js';
+import { trackServer } from '../../../lib/analytics/server.js';
+import { EVENTS } from '../../../lib/analytics/events.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +27,17 @@ export const POST = withAuth(async (user, request) => {
     // Strip pasted credentials before this text reaches the model.
     conversationText: redactForLlm(conversation_text, 'blueprint.create'),
     sourceTurnId: source_turn_id,
+  });
+
+  trackServer(EVENTS.BLUEPRINT_CREATED, {
+    distinctId: user.id,
+    blueprint_id: result.blueprintId,
+    session_id,
+    version: result.version,
+    status: result.status,
+    readiness_score: result.readiness?.score ?? null,
+    systems_count: result.blueprint?.systems?.length ?? null,
+    process_steps_count: result.blueprint?.process_steps?.length ?? null,
   });
 
   return NextResponse.json(

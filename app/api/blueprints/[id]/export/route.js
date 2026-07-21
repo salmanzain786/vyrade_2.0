@@ -3,6 +3,8 @@ import JSZip from 'jszip';
 import { runPlatformExport, UnsupportedPlatformError } from '../../../../../lib/services/exportService.js';
 import { withAuth } from '../../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
+import { trackServer } from '../../../../../lib/analytics/server.js';
+import { EVENTS } from '../../../../../lib/analytics/events.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +33,20 @@ export const POST = withAuth(async (user, request, { params }) => {
     allowGeneric: body.allow_generic === true,
     allowHistorical: body.allow_historical === true,
   });
+
+  // The prompt-copy path is a client-tracked action (Claude Prompt Copied); the
+  // authoritative "Export Completed" only covers real file/workflow exports.
+  if (body.part !== 'prompt') {
+    trackServer(EVENTS.EXPORT_COMPLETED, {
+      distinctId: user.id,
+      blueprint_id: params.id,
+      platform: result.platform,
+      kind: result.kind,
+      readiness: result.readiness ?? null,
+      grounded: result.grounded ?? null,
+      file_count: result.files ? Object.keys(result.files).length : null,
+    });
+  }
 
   if (result.kind === 'workflow') {
     return NextResponse.json({ platform: result.platform, readiness: result.readiness, workflow: result.workflow });

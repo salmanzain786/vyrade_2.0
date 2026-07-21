@@ -1,5 +1,7 @@
+import { Suspense } from 'react';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from 'sonner';
+import AnalyticsProvider from '@/lib/analytics/AnalyticsProvider';
 import './globals.css';
 
 export const metadata = {
@@ -27,6 +29,11 @@ export default function RootLayout({ children }) {
           disableTransitionOnChange
         >
           {children}
+          {/* Boots Mixpanel + tracks page views. Suspense: usePathname is a
+              client hook that Next wants isolated from the static shell. */}
+          <Suspense fallback={null}>
+            <AnalyticsProvider />
+          </Suspense>
           <Toaster position="top-right" richColors closeButton theme="dark" />
         </ThemeProvider>
       </body>

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Loader2, Copy, Download, FileCode2, Lock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ExportPlatformModal from '@/components/ExportPlatformModal';
+import { track } from '@/lib/analytics/mixpanel';
+import { EVENTS } from '@/lib/analytics/events';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -125,6 +127,10 @@ export default function BlueprintSheet({
 
   function handleDownload() {
     if (!workflow) return;
+    track(EVENTS.WORKFLOW_DOWNLOADED, {
+      blueprint_id: blueprintId,
+      node_count: workflow?.nodes?.length ?? null,
+    });
     const jsonText = JSON.stringify(workflow, null, 2);
     const blob = new Blob([jsonText], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -264,7 +270,13 @@ export default function BlueprintSheet({
         */}
         <Button
           size="lg"
-          onClick={() => setExportOpen(true)}
+          onClick={() => {
+            track(EVENTS.EXPORT_MODAL_OPENED, {
+              blueprint_id: blueprintId,
+              readiness_score: readiness?.score ?? null,
+            });
+            setExportOpen(true);
+          }}
           disabled={!canGenerate}
           className="mb-3 h-11 w-full gap-2 text-[13px] font-semibold"
         >

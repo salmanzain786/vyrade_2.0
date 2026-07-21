@@ -3,6 +3,8 @@ import { verifyEmail } from '../../../../lib/services/authService.js';
 import { setSessionCookie } from '../../../../lib/auth/session.js';
 import { withRateLimit } from '../../../../lib/auth/rateLimit.js';
 import { authErrorResponse } from '../../../../lib/auth/routeHelpers.js';
+import { trackServer, setPerson } from '../../../../lib/analytics/server.js';
+import { EVENTS } from '../../../../lib/analytics/events.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +19,8 @@ export async function POST(request) {
     );
     // Verifying the email also logs the user in.
     setSessionCookie(userId);
+    trackServer(EVENTS.EMAIL_VERIFIED, { distinctId: userId, email: body.email });
+    setPerson(userId, { $email: body.email, email_verified: true });
     return NextResponse.json({ ok: true, message: 'Email verified. You are now signed in.' });
   } catch (err) {
     return authErrorResponse(err, 'Verification failed');

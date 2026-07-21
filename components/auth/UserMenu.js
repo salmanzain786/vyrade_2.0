@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { track, resetAnalytics } from '@/lib/analytics/mixpanel';
+import { EVENTS } from '@/lib/analytics/events';
 
 // Compact signed-in identity + sign-out control for the app header.
 export default function UserMenu({ user }) {
@@ -10,11 +12,14 @@ export default function UserMenu({ user }) {
 
   async function signOut() {
     setBusy(true);
+    track(EVENTS.SIGN_OUT_CLICKED);
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {
       /* ignore — we redirect regardless */
     }
+    // Clear the Mixpanel identity so the next user on this device is distinct.
+    resetAnalytics();
     // Full navigation so server components re-evaluate the cleared session.
     window.location.assign('/login');
   }

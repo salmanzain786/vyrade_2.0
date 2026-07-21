@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import AuthShell, { Field, AuthInput, AuthButton, AuthLink } from '@/components/auth/AuthShell';
+import { track } from '@/lib/analytics/mixpanel';
+import { EVENTS } from '@/lib/analytics/events';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -18,6 +20,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
     setBusy(true);
+    track(EVENTS.SIGN_UP_SUBMITTED);
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',

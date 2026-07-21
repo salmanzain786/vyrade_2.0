@@ -11,6 +11,8 @@ import BlueprintSheet from '@/components/BlueprintSheet';
 import WorkflowModal from '@/components/WorkflowModal';
 import { VyradeMark } from '@/components/VyradeLogo';
 import { cn } from '@/lib/utils';
+import { track, identifyUser } from '@/lib/analytics/mixpanel';
+import { EVENTS } from '@/lib/analytics/events';
 
 export function newChatId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -46,6 +48,9 @@ export default function ChatWorkspace({ sessionId, user }) {
   const [, setErrorMsg] = useState(null);
 
   const scrollRef = useRef(null);
+
+  // Attach the signed-in identity to this device so every event is attributed.
+  useEffect(() => { identifyUser(user); }, [user]);
 
   const persistMessage = useCallback((sid, role, content) => {
     fetch(`/api/conversations/${sid}/messages`, {
@@ -178,6 +183,11 @@ export default function ChatWorkspace({ sessionId, user }) {
     if (!text || busy) return;
     setQuery('');
     setErrorMsg(null);
+    track(EVENTS.MESSAGE_SENT, {
+      session_id: sessionId,
+      is_first_message: !blueprintId,
+      char_count: text.length,
+    });
     pushMessage('user', text);
     setBusy(true);
     setThinking(true);
@@ -236,6 +246,12 @@ export default function ChatWorkspace({ sessionId, user }) {
     if (!blueprintId || !version) return;
     setGenerating(true);
     setErrorMsg(null);
+    track(EVENTS.GENERATE_WORKFLOW_CLICKED, {
+      blueprint_id: blueprintId,
+      readiness_score: readiness?.score ?? null,
+      is_regenerate: !!workflow,
+    });
+    const startedAt = Date.now();
     try {
       const finalizeRes = await fetch(`/api/blueprints/${blueprintId}/finalize`, {
         method: 'POST',
@@ -263,9 +279,22 @@ export default function ChatWorkspace({ sessionId, user }) {
       setWorkflowStale(false);
       setShowWorkflow(true);
       setMessages((prev) => [...prev, { role: 'system', content: 'Generated n8n workflow.' }]);
+      // Server fires the authoritative "Workflow Generated" with node/token/cost
+      // detail; this client event carries the user-perceived latency.
+      track(EVENTS.WORKFLOW_VIEWED, {
+        blueprint_id: blueprintId,
+        source: 'generation',
+        node_count: genData.workflow?.nodes?.length ?? null,
+        duration_ms: Date.now() - startedAt,
+      });
     } catch (err) {
       setErrorMsg(err.message);
       pushMessage('system', `Could not generate workflow: ${err.message}`);
+      track(EVENTS.WORKFLOW_GENERATION_FAILED, {
+        blueprint_id: blueprintId,
+        error: err.message,
+        duration_ms: Date.now() - startedAt,
+      });
     } finally {
       setGenerating(false);
     }
@@ -276,6 +305,7 @@ export default function ChatWorkspace({ sessionId, user }) {
   async function handleExport(platform) {
     if (!blueprintId || exportingPlatform) return;
     setExportingPlatform(platform);
+    track(EVENTS.EXPORT_PLATFORM_SELECTED, { blueprint_id: blueprintId, platform });
     try {
       const res = await fetch(`/api/blueprints/${blueprintId}/export`, {
         method: 'POST',
@@ -297,12 +327,15 @@ export default function ChatWorkspace({ sessionId, user }) {
       URL.revokeObjectURL(url);
       const grounded = res.headers.get('X-Export-Grounded');
       const readiness = res.headers.get('X-Export-Readiness');
+      // NB: the authoritative "Export Completed" is fired server-side (richer +
+      // ad-blocker-proof). Here we only surface client-visible failures below.
       toast.success(
         readiness === 'guide' || readiness === 'coming_soon'
           ? `${platform} implementation guide downloaded${grounded === 'false' ? ' (generic)' : ''}`
           : 'Package downloaded'
       );
     } catch (err) {
+      track(EVENTS.EXPORT_FAILED, { blueprint_id: blueprintId, platform, error: err.message });
       toast.error(err.message);
     } finally {
       setExportingPlatform(null);
@@ -320,14 +353,23 @@ export default function ChatWorkspace({ sessionId, user }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not build prompt');
       await navigator.clipboard.writeText(data.prompt);
+      track(EVENTS.CLAUDE_PROMPT_COPIED, { blueprint_id: blueprintId });
       toast.success('Claude prompt copied to clipboard');
     } catch (err) {
       toast.error(err.message);
     }
   }
 
-  function handleNewChat() { router.push(`/chat/${newChatId()}`); }
-  function handleSelectConversation(sid) { if (sid !== sessionId && !busy) router.push(`/chat/${sid}`); }
+  function handleNewChat() {
+    track(EVENTS.NEW_CHAT_CLICKED, { from_session_id: sessionId });
+    router.push(`/chat/${newChatId()}`);
+  }
+  function handleSelectConversation(sid) {
+    if (sid !== sessionId && !busy) {
+      track(EVENTS.CONVERSATION_SELECTED, { session_id: sid });
+      router.push(`/chat/${sid}`);
+    }
+  }
 
   const empty = messages.length === 0 && !thinking;
   const statusColor =
@@ -420,7 +462,10 @@ export default function ChatWorkspace({ sessionId, user }) {
                 generating={generating}
                 workflow={workflow}
                 workflowStale={workflowStale}
-                onViewWorkflow={() => setShowWorkflow(true)}
+                onViewWorkflow={() => {
+                  track(EVENTS.WORKFLOW_VIEWED, { blueprint_id: blueprintId, source: 'view_button' });
+                  setShowWorkflow(true);
+                }}
                 onExportPlatform={handleExport}
                 onCopyPrompt={handleCopyClaudePrompt}
                 exportingPlatform={exportingPlatform}

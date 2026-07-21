@@ -3,6 +3,8 @@
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AuthShell, { Field, AuthInput, AuthButton, AuthLink } from '@/components/auth/AuthShell';
+import { track } from '@/lib/analytics/mixpanel';
+import { EVENTS } from '@/lib/analytics/events';
 
 function VerifyEmailInner() {
   const params = useSearchParams();
@@ -16,6 +18,7 @@ function VerifyEmailInner() {
   async function onSubmit(e) {
     e.preventDefault();
     setError(null); setNotice(null); setBusy(true);
+    track(EVENTS.VERIFY_EMAIL_SUBMITTED);
     try {
       const res = await fetch('/api/auth/verify-email', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -31,6 +34,7 @@ function VerifyEmailInner() {
 
   async function onResend() {
     setError(null); setNotice(null); setResending(true);
+    track(EVENTS.RESEND_OTP_CLICKED, { context: 'verify_email' });
     try {
       const res = await fetch('/api/auth/resend-otp', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },

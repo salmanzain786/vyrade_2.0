@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthShell, { Field, AuthInput, AuthButton, AuthLink } from '@/components/auth/AuthShell';
+import { track } from '@/lib/analytics/mixpanel';
+import { EVENTS } from '@/lib/analytics/events';
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -18,6 +20,7 @@ export default function ForgotPasswordPage() {
   async function requestCode(e) {
     e.preventDefault();
     setError(null); setNotice(null); setBusy(true);
+    track(EVENTS.FORGOT_PASSWORD_SUBMITTED);
     try {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -35,6 +38,7 @@ export default function ForgotPasswordPage() {
     setError(null); setNotice(null);
     if (password !== confirm) { setError('Passwords do not match'); return; }
     setBusy(true);
+    track(EVENTS.RESET_PASSWORD_SUBMITTED);
     try {
       const verifyRes = await fetch('/api/auth/verify-reset-otp', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },

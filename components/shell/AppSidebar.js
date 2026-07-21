@@ -9,6 +9,8 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { track, resetAnalytics } from '@/lib/analytics/mixpanel';
+import { EVENTS } from '@/lib/analytics/events';
 
 const navItemClass =
   'flex size-10 items-center justify-center rounded-lg hover:bg-accent hover:text-accent-foreground transition-colors text-foreground';
@@ -31,10 +33,16 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
 
   React.useEffect(() => setMounted(true), []);
   const isDark = mounted ? resolvedTheme === 'dark' : true;
-  const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
+  const toggleTheme = () => {
+    const next = isDark ? 'light' : 'dark';
+    track(EVENTS.THEME_TOGGLED, { theme: next });
+    setTheme(next);
+  };
 
   async function signOut() {
+    track(EVENTS.SIGN_OUT_CLICKED);
     try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    resetAnalytics();
     window.location.assign('/login');
   }
 
@@ -65,6 +73,11 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
     </div>
   );
 
+  function openHistory() {
+    track(EVENTS.CHAT_HISTORY_OPENED, { chat_count: conversations.length });
+    setHistoryOpen(true);
+  }
+
   function pick(sid) {
     setHistoryOpen(false);
     onSelect?.(sid);
@@ -89,7 +102,7 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => setHistoryOpen(true)}
+                onClick={openHistory}
                 className={cn(navItemClass, historyOpen && 'bg-accent text-accent-foreground')}
               >
                 <History className="h-5 w-5" />
@@ -130,7 +143,7 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
         <button onClick={onNewChat} className={mobileNavItemClass}>
           <Plus className="h-5 w-5" /><span className="text-[10px] font-medium">New</span>
         </button>
-        <button onClick={() => setHistoryOpen(true)} className={mobileNavItemClass}>
+        <button onClick={openHistory} className={mobileNavItemClass}>
           <History className="h-5 w-5" /><span className="text-[10px] font-medium">History</span>
         </button>
         <button onClick={toggleTheme} className={mobileNavItemClass}>

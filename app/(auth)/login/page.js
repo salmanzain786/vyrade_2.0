@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import AuthShell, { Field, AuthInput, AuthButton, AuthLink } from '@/components/auth/AuthShell';
+import { track } from '@/lib/analytics/mixpanel';
+import { EVENTS } from '@/lib/analytics/events';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,6 +19,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setBusy(true);
+    track(EVENTS.LOGIN_SUBMITTED);
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',

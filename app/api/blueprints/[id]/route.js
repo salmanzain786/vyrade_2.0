@@ -4,6 +4,8 @@ import { getLatest } from '../../../../lib/services/blueprintRepository.js';
 import { withAuth } from '../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../lib/auth/ownership.js';
 import { redactForLlm } from '../../../../lib/security/redact.js';
+import { trackServer } from '../../../../lib/analytics/server.js';
+import { EVENTS } from '../../../../lib/analytics/events.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +36,14 @@ export const PATCH = withAuth(async (user, request, { params }) => {
     newUserTurn: redactForLlm(new_user_turn, 'blueprint.patch'),
     changeReason: change_reason,
     sourceTurnId: source_turn_id,
+  });
+
+  trackServer(EVENTS.BLUEPRINT_UPDATED, {
+    distinctId: user.id,
+    blueprint_id: result.blueprintId,
+    version: result.version,
+    status: result.status,
+    readiness_score: result.readiness?.score ?? null,
   });
 
   return NextResponse.json({
