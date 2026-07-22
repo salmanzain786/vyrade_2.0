@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowRight, Eye, Download, RefreshCw, CheckCircle2 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { PlatformChip, PLATFORMS } from '@/components/PlatformIcons';
 import { READINESS_LABEL } from '@/lib/exporters/registry';
 import GenerationLoader from '@/components/chat/GenerationLoader';
@@ -26,23 +27,37 @@ export default function ExportPlatformModal({
   onExportPlatform,    // claude / make / zapier
   generating,          // n8n in flight
   exportingPlatform,   // 'claude' | 'make' | 'zapier' | null
+  // Saved n8n workflow + its view/download handlers (present once generated).
+  workflow,
+  onViewWorkflow,
+  onDownloadWorkflow,
 }) {
   const busyPlatform = generating ? 'n8n' : exportingPlatform || null;
   const busy = !!busyPlatform;
 
-  // Close automatically once the work finishes, so the user lands on the result
-  // instead of this modal covering the workflow canvas that just opened.
-  const wasBusy = useRef(false);
+  // Guides (make/zapier/claude) aren't persisted, so remember which ones the
+  // user has produced THIS session to flip them into the "generated" state.
+  const [exported, setExported] = useState(() => new Set());
+  const lastBusy = useRef(null);
+
   useEffect(() => {
-    if (busy) { wasBusy.current = true; return; }
-    if (wasBusy.current && open) {
-      wasBusy.current = false;
+    if (busy) { lastBusy.current = busyPlatform; return; }
+    const finished = lastBusy.current;
+    lastBusy.current = null;
+    if (!finished || !open) return;
+    if (finished === 'n8n') {
+      // The workflow canvas opens on success — land the user there, not on this.
       onOpenChange(false);
+    } else {
+      setExported((s) => new Set(s).add(finished));
     }
-  }, [busy, open, onOpenChange]);
+  }, [busy, busyPlatform, open, onOpenChange]);
 
   const readinessOf = (key) =>
     platformReadiness?.[key] ?? (key === 'n8n' || key === 'claude' ? 'full' : 'coming_soon');
+
+  // n8n has a real saved workflow; guides are "generated" if produced this session.
+  const isGenerated = (key) => (key === 'n8n' ? !!workflow : exported.has(key));
 
   function run(key) {
     if (busy) return;
@@ -50,29 +65,34 @@ export default function ExportPlatformModal({
     else onExportPlatform?.(key);
   }
 
+  function viewWorkflow() {
+    onViewWorkflow?.();
+    onOpenChange(false); // reveal the full-width canvas underneath
+  }
+
   return (
-    <Dialog open={open} onOpenChange={() => { /* controlled: only the Close button dismisses */ }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !busy) onOpenChange(false); }}>
       <DialogContent
         hideClose
         className="max-w-2xl gap-0 p-0 overflow-hidden"
-        // Deliberately non-dismissible: no outside click, no Esc. The user must
-        // press Close — which keeps a long generation from being lost by a stray click.
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        // Non-dismissible WHILE BUSY only — a long generation shouldn't be lost
+        // to a stray click; when idle the user can click out / press Esc / Close.
+        onPointerDownOutside={(e) => { if (busy) e.preventDefault(); }}
+        onInteractOutside={(e) => { if (busy) e.preventDefault(); }}
+        onEscapeKeyDown={(e) => { if (busy) e.preventDefault(); }}
       >
         <DialogHeader className="border-b border-border px-6 py-4">
           <DialogTitle className="text-base">
-            {busy ? 'Generating…' : 'Choose an export target'}
+            {busy ? 'Generating…' : 'Build & export this automation'}
           </DialogTitle>
           <DialogDescription className="text-xs">
             {busy
               ? 'Hang tight — this runs against live retrieval and the model.'
-              : 'Your Blueprint is complete. Pick where you want to build this automation.'}
+              : 'Generate for any platform. Already built ones can be viewed, downloaded, or regenerated.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[60vh] overflow-y-auto scrollbar-thin px-6 py-5">
+        <div className="max-h-[62vh] overflow-y-auto scrollbar-thin px-6 py-5">
           {busy ? (
             <GenerationLoader
               platform={busyPlatform}
@@ -83,39 +103,73 @@ export default function ExportPlatformModal({
               {TARGETS.map(({ key, blurb }) => {
                 const meta = PLATFORMS[key];
                 const r = readinessOf(key);
-                const disabled = r === 'coming_soon';
+                const comingSoon = r === 'coming_soon';
+                const generated = isGenerated(key);
+                const isN8n = key === 'n8n';
+
                 return (
-                  <button
+                  <div
                     key={key}
-                    type="button"
-                    onClick={() => run(key)}
-                    disabled={disabled}
                     className={cn(
-                      'group flex flex-col gap-2 rounded-xl border p-4 text-left transition-all',
-                      disabled
-                        ? 'cursor-not-allowed border-border opacity-55'
-                        : 'border-border hover:border-blue-500/50 hover:bg-accent/50'
+                      'flex flex-col gap-2 rounded-xl border p-4 text-left transition-all',
+                      generated ? 'border-green-500/30 bg-green-500/[0.03]'
+                        : comingSoon ? 'border-border opacity-55'
+                        : 'border-border'
                     )}
                   >
                     <div className="flex items-center gap-2.5">
                       <PlatformChip platform={key} />
                       <span className="font-medium text-foreground">{meta?.name || key}</span>
-                      {!disabled && (
-                        <ArrowRight className="ml-auto h-4 w-4 -translate-x-1 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                      {generated ? (
+                        <Badge variant="outline" className="ml-auto gap-1 border-green-500/20 bg-green-500/10 text-[10px] text-green-500">
+                          <CheckCircle2 className="h-3 w-3" /> Generated
+                        </Badge>
+                      ) : (
+                        <span
+                          className={cn(
+                            'ml-auto w-fit rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                            r === 'full' && 'bg-green-500/10 text-green-500',
+                            r === 'guide' && 'bg-blue-500/10 text-blue-500',
+                            r === 'coming_soon' && 'bg-muted text-muted-foreground'
+                          )}
+                        >
+                          {READINESS_LABEL[r] || r}
+                        </span>
                       )}
                     </div>
+
                     <p className="text-xs leading-relaxed text-muted-foreground">{blurb}</p>
-                    <span
-                      className={cn(
-                        'mt-auto w-fit rounded-md px-1.5 py-0.5 text-[10px] font-medium',
-                        r === 'full' && 'bg-green-500/10 text-green-500',
-                        r === 'guide' && 'bg-blue-500/10 text-blue-500',
-                        r === 'coming_soon' && 'bg-muted text-muted-foreground'
-                      )}
-                    >
-                      {READINESS_LABEL[r] || r}
-                    </span>
-                  </button>
+
+                    {/* Actions */}
+                    {generated ? (
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {isN8n && (
+                          <>
+                            <Button size="sm" variant="secondary" className="h-8 gap-1.5 text-xs" onClick={viewWorkflow}>
+                              <Eye className="h-3.5 w-3.5" /> View
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => onDownloadWorkflow?.()}>
+                              <Download className="h-3.5 w-3.5" /> Download
+                            </Button>
+                          </>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => run(key)} disabled={busy}>
+                          <RefreshCw className="h-3.5 w-3.5" /> Regenerate{isN8n ? '' : ' & download'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="mt-1 h-8 w-full gap-1.5 text-xs"
+                        disabled={comingSoon || busy}
+                        onClick={() => run(key)}
+                      >
+                        {comingSoon
+                          ? 'Coming soon'
+                          : (<>{isN8n ? 'Generate workflow' : 'Generate & download'}<ArrowRight className="h-3.5 w-3.5" /></>)}
+                      </Button>
+                    )}
+                  </div>
                 );
               })}
             </div>

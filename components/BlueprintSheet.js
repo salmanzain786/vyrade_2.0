@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Copy, Download, FileCode2, Lock, Sparkles } from 'lucide-react';
+import { Loader2, Copy, Download, FileCode2, Lock, Sparkles, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ExportPlatformModal from '@/components/ExportPlatformModal';
+import CostComparisonModal from '@/components/CostComparisonModal';
 import { track } from '@/lib/analytics/mixpanel';
 import { EVENTS } from '@/lib/analytics/events';
 import { Badge } from '@/components/ui/badge';
@@ -117,6 +118,7 @@ export default function BlueprintSheet({
 }) {
   const bp = blueprint;
   const [exportOpen, setExportOpen] = useState(false);
+  const [costOpen, setCostOpen] = useState(false);
   // Gate on the readiness STATUS, not a literal 100% score: the score can sit
   // below 100 with non-blocking unknowns while the server-side export gate still
   // passes. The not-ready label shows the score purely as information.
@@ -293,6 +295,21 @@ export default function BlueprintSheet({
           )}
         </Button>
 
+        {blueprintId && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              track(EVENTS.COST_ESTIMATE_OPENED, { blueprint_id: blueprintId });
+              setCostOpen(true);
+            }}
+            className="mb-3 h-9 w-full gap-1.5 text-xs"
+          >
+            <Calculator className="h-3.5 w-3.5" />
+            Estimate &amp; compare cost
+          </Button>
+        )}
+
         <ExportPlatformModal
           open={exportOpen}
           onOpenChange={setExportOpen}
@@ -301,6 +318,15 @@ export default function BlueprintSheet({
           onExportPlatform={onExportPlatform}
           generating={generating}
           exportingPlatform={exportingPlatform}
+          workflow={workflow}
+          onViewWorkflow={onViewWorkflow}
+          onDownloadWorkflow={handleDownload}
+        />
+
+        <CostComparisonModal
+          open={costOpen}
+          onOpenChange={setCostOpen}
+          blueprintId={blueprintId}
         />
 
         {workflow && workflowStale && (
@@ -313,7 +339,7 @@ export default function BlueprintSheet({
           </div>
         )}
 
-        <WorkflowRouting
+        {/* <WorkflowRouting
           canGenerate={canGenerate}
           generating={generating}
           workflow={workflow}
@@ -324,14 +350,13 @@ export default function BlueprintSheet({
           exportingPlatform={exportingPlatform}
           platformReadiness={platformReadiness}
           onExportPlatform={onExportPlatform}
-        />
+        /> */}
 
-        {blueprintId && (onExportPlatform || onCopyPrompt) && (
+        {/* {blueprintId && (onExportPlatform || onCopyPrompt) && (
           <div
             className="mb-3 mt-2 grid grid-cols-2 gap-1.5"
             title={canGenerate ? undefined : 'Available once the blueprint is complete'}
           >
-            {/* Both go through the same server gate (complete + current blueprint). */}
             <Button variant="ghost" size="sm" onClick={onCopyPrompt} disabled={!canGenerate} className="h-8 gap-1.5 text-xs">
               <Copy className="h-3.5 w-3.5" /> Copy prompt
             </Button>
@@ -340,7 +365,7 @@ export default function BlueprintSheet({
               {exportingPlatform === 'claude' ? 'Preparing…' : 'Claude package'}
             </Button>
           </div>
-        )}
+        )} */}
 
         <Separator className="mb-3" />
 
