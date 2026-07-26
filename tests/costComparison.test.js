@@ -36,6 +36,19 @@ describe('buildCostComparison', () => {
     expect(claude.estimated_units).toEqual({});
     expect(zapier.estimated_units.task).toBeGreaterThan(0);
   });
+
+  it('returns vendor-neutral tradeoffs + a platform/operational/usage split per platform', async () => {
+    const c = await buildCostComparison({ blueprint: baseBlueprint(), resolvers: emptyResolvers });
+    // A tradeoff profile for each platform.
+    expect(c.tradeoffs.map((t) => t.platform)).toEqual(COMPARISON_PLATFORMS);
+    expect(c.tradeoffs.find((t) => t.platform === 'n8n').summary).toMatch(/hosting|maintenance/i);
+    // Each estimate carries the three cost groups.
+    for (const p of c.platforms) {
+      expect(p.cost_groups).toHaveProperty('platform');
+      expect(p.cost_groups).toHaveProperty('operational');
+      expect(p.cost_groups).toHaveProperty('usage');
+    }
+  });
 });
 
 describe('cost-saving suggestions — grounded, not fabricated', () => {
@@ -58,16 +71,23 @@ describe('cost-saving suggestions — grounded, not fabricated', () => {
     expect(c.suggestions.some((s) => /seed pricing/i.test(s.title))).toBe(true);
   });
 
-  it('names the cheapest platform once cores are priced', () => {
-    // Direct unit test of the pure suggester with synthetic priced estimates.
+  it('never declares an outright "cheapest" — frames platform vs. total cost', () => {
+    const grp = (known, unpriced = false) => ({ known, has_unpriced: unpriced });
     const platforms = [
-      { platform: 'n8n', platform_name: 'n8n', estimated_total: 30, estimated_units: { execution: 500 }, cost_components: [], unknowns: [] },
-      { platform: 'zapier', platform_name: 'Zapier', estimated_total: 55, estimated_units: { task: 1000 }, cost_components: [], unknowns: [] },
+      { platform: 'n8n', platform_name: 'n8n', estimated_total: 30, estimated_units: { execution: 500 }, cost_components: [], unknowns: [],
+        cost_groups: { platform: grp(5), operational: grp(0, true), usage: grp(0, true) } },
+      { platform: 'zapier', platform_name: 'Zapier', estimated_total: 55, estimated_units: { task: 1000 }, cost_components: [], unknowns: [],
+        cost_groups: { platform: grp(40), operational: grp(0), usage: grp(0, true) } },
     ];
     const s = buildSuggestions(platforms, baseBlueprint());
-    const rec = s.find((x) => x.kind === 'recommendation');
-    expect(rec.title).toMatch(/n8n/);
-    expect(rec.detail).toMatch(/\$30/);
+    // The forbidden framing must never appear.
+    expect(s.some((x) => /cheapest/i.test(`${x.title} ${x.detail}`))).toBe(false);
+    // Always includes the total-cost-of-ownership framing.
+    expect(s.some((x) => x.kind === 'framing')).toBe(true);
+    // Names the lowest METERED platform (n8n, $5) but pairs it with responsibility.
+    const t = s.find((x) => x.kind === 'tradeoff');
+    expect(t.title).toMatch(/n8n/);
+    expect(t.detail).toMatch(/hosting|maintenance/i);
   });
 
   it('warns that multi-step workflows favour n8n over Zapier', () => {

@@ -178,9 +178,13 @@ export default function ExportPlatformModal({
 
         <div className="flex items-center justify-between border-t border-border px-6 py-3">
           <span className="text-[11px] text-muted-foreground">
-            {busy ? 'You can close this — the export continues.' : 'Exports run from the current Blueprint version.'}
+            {busy
+              ? 'Please keep this window open until the export completes.'
+              : 'Exports run from the current Blueprint version.'}
           </span>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+          {/* Consistent with the blocked outside-click/Esc: the window can't be
+              dismissed mid-generation, so the Close button is disabled too. */}
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>
             Close
           </Button>
         </div>

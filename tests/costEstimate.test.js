@@ -106,6 +106,50 @@ describe('buildCostEstimate — prices applied', () => {
   });
 });
 
+describe('P1 — honest presentation (no fake precision)', () => {
+  const emptyResolvers = {
+    platformPrice: async () => ({ price: null, confidence: 'unknown' }),
+    connectorCost: async () => ({ cost: null, confidence: 'unknown' }),
+    connectorInfo: async () => ({ found: false }),
+  };
+
+  it('exposes known_monthly_cost + assumptions, and withholds a full total when not fully priced', async () => {
+    const est = await buildCostEstimate({ blueprint: shopifyBlueprint(), platform: 'zapier', resolvers: emptyResolvers });
+    expect(est).toHaveProperty('known_monthly_cost');       // the honest headline
+    expect(Array.isArray(est.assumptions)).toBe(true);
+    expect(est.assumptions.length).toBeGreaterThan(0);
+    expect(est.fully_priced).toBe(false);                   // not everything priced…
+    expect(est.estimated_total).toBeNull();                 // …so NO single total
+    expect(est.priced_components).toBeLessThan(est.total_components);
+  });
+
+  it('a priced line carries its source + last_checked for provenance', async () => {
+    const resolvers = {
+      platformPrice: async (_p, ct) => ct === 'platform_task_usage'
+        ? { price: 0.02, confidence: 'high', source: { source_type: 'official_pricing_page', pricing_url: 'https://zapier.com/pricing', last_checked_at: '2026-07-01 00:00:00' } }
+        : { price: null, confidence: 'unknown' },
+      connectorCost: async () => ({ cost: null, confidence: 'unknown' }),
+      connectorInfo: async () => ({ found: false }),
+    };
+    const est = await buildCostEstimate({ blueprint: shopifyBlueprint(), platform: 'zapier', resolvers });
+    const tasks = comp(est, 'Zapier task usage');
+    expect(tasks.source).toBe('official_pricing_page');
+    expect(tasks.source_url).toBe('https://zapier.com/pricing');
+    expect(tasks.last_checked).toBe('2026-07-01 00:00:00');
+  });
+
+  it('fully_priced flips true only when every core line has a price', async () => {
+    const allPriced = {
+      platformPrice: async () => ({ price: 0, confidence: 'high', source: { source_type: 'official_pricing_page' } }),
+      connectorCost: async () => ({ cost: 0, confidence: 'medium' }),
+      connectorInfo: async () => ({ found: true, unit_price: 0, pricing_model: 'free', requires_paid_plan: false }),
+    };
+    const est = await buildCostEstimate({ blueprint: shopifyBlueprint(), platform: 'zapier', resolvers: allPriced });
+    expect(est.fully_priced).toBe(true);
+    expect(est.estimated_total).not.toBeNull();
+  });
+});
+
 describe('buildCostEstimate — platform variance', () => {
   it('Claude Code has no metered task line and no estimated_units', async () => {
     const est = await buildCostEstimate({ blueprint: shopifyBlueprint(), platform: 'claude', resolvers: emptyResolvers });

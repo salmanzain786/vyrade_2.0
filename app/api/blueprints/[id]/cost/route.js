@@ -1,37 +1,56 @@
 import { NextResponse } from 'next/server';
 import { getLatest, getVersion } from '../../../../../lib/services/blueprintRepository.js';
 import { buildCostComparison } from '../../../../../lib/services/cost/costComparison.js';
+import { parseVolumeOverride, parseVersion } from '../../../../../lib/services/cost/costQuery.js';
 import { withAuth } from '../../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/blueprints/[id]/cost?version=&monthlyRuns=
-// Cross-platform cost comparison for a Blueprint (owner only). Prices come from
-// the pricing_sources / connector_cost_profiles registries; anything unpriced is
-// reported as unknown, never guessed.
+//
+// Cross-platform cost comparison for a Blueprint. A cost response can reveal the
+// user's systems, tools, volume and automation design, so this route is locked:
+//   • withAuth              — authenticated users only (401 otherwise)
+//   • assertBlueprintOwner  — the caller must OWN this Blueprint (403/404),
+//                             enforced BEFORE any Blueprint data is read or any
+//                             cost is computed → never another user's data.
+//   • current version by default; an explicit ?version= must be a positive int
+//     AND still resolves within THIS (owner-gated) Blueprint.
+//   • ?monthlyRuns= override is validated (positive, bounded) and surfaced to
+//     the user as an explicit assumption ("User-provided volume: N runs/month").
 export const GET = withAuth(async (user, request, { params }) => {
+  // Ownership gate FIRST — nothing below runs for a Blueprint the user doesn't own.
   await assertBlueprintOwner(user, params.id);
 
   const url = new URL(request.url);
-  const versionParam = url.searchParams.get('version');
-  const runsParam = url.searchParams.get('monthlyRuns');
 
-  const record = versionParam
-    ? await getVersion(params.id, Number(versionParam))
+  // (4) Validate the volume override — reject junk (negative/zero/NaN/huge)
+  // rather than silently ignoring it.
+  const vol = parseVolumeOverride(url.searchParams.get('monthlyRuns'));
+  if (vol.error) return NextResponse.json({ error: vol.error }, { status: 400 });
+
+  // (3) Validate an optional explicit version; default is the current version.
+  const ver = parseVersion(url.searchParams.get('version'));
+  if (ver.error) return NextResponse.json({ error: ver.error }, { status: 400 });
+
+  // getVersion is scoped to THIS blueprint id (already owner-checked), so a
+  // version override can never reach another Blueprint's data.
+  const record = ver.value != null
+    ? await getVersion(params.id, ver.value)
     : await getLatest(params.id);
   if (!record?.blueprint) {
     return NextResponse.json({ error: 'Blueprint not found' }, { status: 404 });
   }
 
-  const monthlyRuns = runsParam && Number.isFinite(Number(runsParam)) ? Number(runsParam) : null;
-
   const comparison = await buildCostComparison({
     blueprint: record.blueprint,
     blueprintId: params.id,
     blueprintVersion: record.version,
-    monthlyRuns,
+    monthlyRuns: vol.value,
   });
 
-  return NextResponse.json(comparison);
+  // Echo the override so the client can label it; the estimate's `assumptions`
+  // already carry the "User-provided volume: N runs/month" note.
+  return NextResponse.json({ ...comparison, volume_override: vol.value });
 });
