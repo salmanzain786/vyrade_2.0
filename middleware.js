@@ -9,7 +9,11 @@ import { NextResponse } from 'next/server';
 const SESSION_COOKIE = 'vyrade_session';
 
 // Paths reachable while signed out. Everything else requires a session.
-const PUBLIC_PAGES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
+const PUBLIC_PAGES = [
+  '/login', '/register', '/verify-email', '/forgot-password', '/reset-password',
+  // Public Workflow Encyclopedia (SEO / technology-page strategy).
+  '/technology', '/workflows',
+];
 
 function looksLikeLiveSession(token) {
   if (!token || !token.includes('.')) return false;

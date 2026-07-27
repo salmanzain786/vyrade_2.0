@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Copy, Download, FileCode2, Lock, Sparkles, Calculator } from 'lucide-react';
+import { Loader2, Copy, Download, FileCode2, Lock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ExportPlatformModal from '@/components/ExportPlatformModal';
-import CostComparisonModal from '@/components/CostComparisonModal';
+import GuidedBuildModal from '@/components/GuidedBuildModal';
 import { track } from '@/lib/analytics/mixpanel';
 import { EVENTS } from '@/lib/analytics/events';
 import { Badge } from '@/components/ui/badge';
@@ -117,8 +116,7 @@ export default function BlueprintSheet({
   onExportPlatform, onCopyPrompt, exportingPlatform, platformReadiness,
 }) {
   const bp = blueprint;
-  const [exportOpen, setExportOpen] = useState(false);
-  const [costOpen, setCostOpen] = useState(false);
+  const [guidedOpen, setGuidedOpen] = useState(false);
   // Gate on the readiness STATUS, not a literal 100% score: the score can sit
   // below 100 with non-blocking unknowns while the server-side export gate still
   // passes. The not-ready label shows the score purely as information.
@@ -270,22 +268,21 @@ export default function BlueprintSheet({
           The primary call to action. Disabled until the Blueprint is complete —
           and it says so, rather than failing at the server gate.
         */}
+        {/*
+          One guided path — recommendation → cost → build — instead of separate
+          "generate" and "estimate cost" tools. Disabled (and says so) until the
+          Blueprint is complete.
+        */}
         <Button
           size="lg"
-          onClick={() => {
-            track(EVENTS.EXPORT_MODAL_OPENED, {
-              blueprint_id: blueprintId,
-              readiness_score: readiness?.score ?? null,
-            });
-            setExportOpen(true);
-          }}
+          onClick={() => setGuidedOpen(true)}
           disabled={!canGenerate}
           className="mb-3 h-11 w-full gap-2 text-[13px] font-semibold"
         >
           {canGenerate ? (
             <>
               <Sparkles className="h-4 w-4" />
-              Click here to generate workflow
+              Review &amp; build automation
             </>
           ) : (
             <>
@@ -295,24 +292,10 @@ export default function BlueprintSheet({
           )}
         </Button>
 
-        {blueprintId && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              track(EVENTS.COST_ESTIMATE_OPENED, { blueprint_id: blueprintId });
-              setCostOpen(true);
-            }}
-            className="mb-3 h-9 w-full gap-1.5 text-xs"
-          >
-            <Calculator className="h-3.5 w-3.5" />
-            Estimate &amp; compare cost
-          </Button>
-        )}
-
-        <ExportPlatformModal
-          open={exportOpen}
-          onOpenChange={setExportOpen}
+        <GuidedBuildModal
+          open={guidedOpen}
+          onOpenChange={setGuidedOpen}
+          blueprintId={blueprintId}
           platformReadiness={platformReadiness}
           onGenerate={onGenerate}
           onExportPlatform={onExportPlatform}
@@ -321,12 +304,6 @@ export default function BlueprintSheet({
           workflow={workflow}
           onViewWorkflow={onViewWorkflow}
           onDownloadWorkflow={handleDownload}
-        />
-
-        <CostComparisonModal
-          open={costOpen}
-          onOpenChange={setCostOpen}
-          blueprintId={blueprintId}
         />
 
         {workflow && workflowStale && (

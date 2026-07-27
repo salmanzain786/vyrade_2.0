@@ -84,6 +84,31 @@ nothing breaks. That's the default for local dev, CI, and tests.
 ### Cost / usage (server)
 - **LLM Usage** — `{ operation, blueprint_id, total_tokens, cost_usd, model }`
 
+## Privacy (enforced, not advisory)
+
+Analytics is **privacy-safe by default**. Two mechanisms guarantee it:
+
+1. **Strict property allowlist** (`lib/analytics/sanitize.js`). Only an explicit
+   set of keys (ids, counts, scores, `platform`, `model`, token counts,
+   `cost_usd`, `error_category`, status codes, …) is ever sent — on **both** the
+   client and the server. Everything else is dropped: raw Blueprint text, user
+   messages, workflow JSON, emails, API keys/credentials, customer/CRM data, DB
+   URLs, and error stacks. Even an allowlisted key is refused if its value looks
+   like an email, a URL/connection string, or a long text blob. A new field is
+   invisible to analytics until it's added to the allowlist on purpose.
+
+2. **Pseudonymized identity.** Signed-in events use the `user_id` as
+   `distinct_id`. Pre-auth events (failed login, reset request, resend OTP)
+   never use a raw email — the email is `HMAC-SHA256(AUTH_SECRET, email)` →
+   `anon_…`, a stable but non-reversible id that still stitches the funnel.
+
+3. **PII opt-in.** Person-profile `$email`/`$name` are sent **only** when
+   `ANALYTICS_ALLOW_PII=true` (server) / `NEXT_PUBLIC_ANALYTICS_ALLOW_PII=true`
+   (client). Off by default. Events never carry PII regardless of this flag.
+
+Raw errors are reduced to an `error_category` (`rate_limited`, `unauthorized`,
+`server_error`, …) so failures are chartable without leaking messages.
+
 ## Notes on de-duplication
 
 Key business events (**Workflow Generated**, **Export Completed**) are fired

@@ -53,6 +53,9 @@ async function migrate() {
   await runFile(connection, 'auth_hardening.sql', { tolerant: true });
   await runFile(connection, 'pricing.sql', { tolerant: true });
   await runFile(connection, 'connector_pricing.sql', { tolerant: true });
+  await runFile(connection, 'workflow_encyclopedia.sql', { tolerant: true });
+  await runFile(connection, 'tool_intelligence.sql', { tolerant: true });
+  await runFile(connection, 'operational_events.sql', { tolerant: true });
 
   console.log('Migration applied successfully.');
   await connection.end();

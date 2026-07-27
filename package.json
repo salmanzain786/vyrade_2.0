@@ -8,6 +8,8 @@
     "start": "next start",
     "migrate": "node scripts/migrate.js",
     "seed:pricing": "node scripts/seed-pricing.mjs",
+    "curate:workflows": "node scripts/curate-workflows.mjs",
+    "seed:tools": "node scripts/seed-tools.mjs",
     "cleanup:auth-audit": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/cleanup-auth-audit.js",
     "test": "vitest run",
     "test:watch": "vitest"

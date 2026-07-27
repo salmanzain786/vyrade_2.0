@@ -21,7 +21,7 @@ export const POST = withAuth(async (user, request, { params }) => {
   });
 
   trackServer(EVENTS.BLUEPRINT_FINALIZED, {
-    distinctId: user.id,
+    userId: user.id,
     blueprint_id: params.id,
     version: result.version,
     status: result.status,
@@ -31,7 +31,7 @@ export const POST = withAuth(async (user, request, { params }) => {
   // conversion trivial to chart as its own funnel step.
   if (result.status === 'requirements_complete') {
     trackServer(EVENTS.BLUEPRINT_READY, {
-      distinctId: user.id,
+      userId: user.id,
       blueprint_id: params.id,
       version: result.version,
     });

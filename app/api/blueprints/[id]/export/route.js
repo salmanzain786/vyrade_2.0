@@ -38,7 +38,7 @@ export const POST = withAuth(async (user, request, { params }) => {
   // authoritative "Export Completed" only covers real file/workflow exports.
   if (body.part !== 'prompt') {
     trackServer(EVENTS.EXPORT_COMPLETED, {
-      distinctId: user.id,
+      userId: user.id,
       blueprint_id: params.id,
       platform: result.platform,
       kind: result.kind,

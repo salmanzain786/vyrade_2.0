@@ -10,6 +10,6 @@ export async function POST() {
   // attributed to the right user (the client also calls mixpanel.reset()).
   const user = await getCurrentUser().catch(() => null);
   clearSessionCookie();
-  if (user) trackServer(EVENTS.LOGGED_OUT, { distinctId: user.id, email: user.email });
+  if (user) trackServer(EVENTS.LOGGED_OUT, { userId: user.id });
   return NextResponse.json({ ok: true });
 }

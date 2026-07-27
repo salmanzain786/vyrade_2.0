@@ -17,7 +17,7 @@ export async function POST(request) {
       { request, event: 'reset_password', email: null },
       () => resetPassword(body)
     );
-    trackServer(EVENTS.PASSWORD_RESET_COMPLETED, { distinctId: userId });
+    trackServer(EVENTS.PASSWORD_RESET_COMPLETED, { userId });
     return NextResponse.json({ ok: true, message: 'Password updated. You can now sign in.' });
   } catch (err) {
     return authErrorResponse(err, 'Could not reset password');

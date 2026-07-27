@@ -19,8 +19,8 @@ export async function POST(request) {
     );
     // Verifying the email also logs the user in.
     setSessionCookie(userId);
-    trackServer(EVENTS.EMAIL_VERIFIED, { distinctId: userId, email: body.email });
-    setPerson(userId, { $email: body.email, email_verified: true });
+    trackServer(EVENTS.EMAIL_VERIFIED, { userId });
+    setPerson(userId, { email_verified: true, $email: body.email });
     return NextResponse.json({ ok: true, message: 'Email verified. You are now signed in.' });
   } catch (err) {
     return authErrorResponse(err, 'Verification failed');

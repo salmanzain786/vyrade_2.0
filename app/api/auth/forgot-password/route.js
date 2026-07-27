@@ -17,7 +17,7 @@ export async function POST(request) {
       { request, event: 'forgot_password', email: body.email },
       () => requestPasswordReset(body)
     );
-    trackServer(EVENTS.PASSWORD_RESET_REQUESTED, { distinctId: body.email || 'anonymous', email: body.email });
+    trackServer(EVENTS.PASSWORD_RESET_REQUESTED, { email: body.email });
     // Generic regardless of whether the email exists (no enumeration).
     return NextResponse.json({ ok: true, message: 'If an account exists for that email, a reset code is on its way.' });
   } catch (err) {

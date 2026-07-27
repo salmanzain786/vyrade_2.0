@@ -16,8 +16,8 @@ export async function POST(request) {
       { request, event: 'register', email: body.email },
       () => registerUser(body)
     );
-    trackServer(EVENTS.SIGNED_UP, { distinctId: userId, email, resent: !!resent });
-    if (!resent) setPerson(userId, { $name: body.name, $email: email, signup_source: 'web' });
+    trackServer(EVENTS.SIGNED_UP, { userId, resent: !!resent });
+    if (!resent) setPerson(userId, { signup_source: 'web', email_verified: false, $name: body.name, $email: email });
     return NextResponse.json(
       { ok: true, email, resent, message: 'We sent a 6-digit verification code to your email.' },
       { status: 201 }

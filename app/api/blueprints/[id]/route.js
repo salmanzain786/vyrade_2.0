@@ -39,7 +39,7 @@ export const PATCH = withAuth(async (user, request, { params }) => {
   });
 
   trackServer(EVENTS.BLUEPRINT_UPDATED, {
-    distinctId: user.id,
+    userId: user.id,
     blueprint_id: result.blueprintId,
     version: result.version,
     status: result.status,

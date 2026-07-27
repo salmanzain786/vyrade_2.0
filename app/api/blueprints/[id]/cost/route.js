@@ -50,7 +50,14 @@ export const GET = withAuth(async (user, request, { params }) => {
     monthlyRuns: vol.value,
   });
 
-  // Echo the override so the client can label it; the estimate's `assumptions`
-  // already carry the "User-provided volume: N runs/month" note.
-  return NextResponse.json({ ...comparison, volume_override: vol.value });
+  // Version context so the UI can flag a HISTORICAL estimate ("this is for v3,
+  // not the latest v5") and never let an old estimate read as the current one.
+  return NextResponse.json({
+    ...comparison,
+    blueprint_version: record.version,
+    current_version: record.current_version,
+    is_current: record.is_current,
+    requested_version: ver.value,      // null when the caller didn't pin a version
+    volume_override: vol.value,
+  });
 });

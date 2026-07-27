@@ -30,7 +30,7 @@ export const POST = withAuth(async (user, request) => {
   });
 
   trackServer(EVENTS.BLUEPRINT_CREATED, {
-    distinctId: user.id,
+    userId: user.id,
     blueprint_id: result.blueprintId,
     session_id,
     version: result.version,

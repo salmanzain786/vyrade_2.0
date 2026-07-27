@@ -15,7 +15,7 @@ export async function POST(request) {
       { request, event: 'resend_otp', email: body.email },
       () => resendVerification(body)
     );
-    trackServer(EVENTS.OTP_RESENT, { distinctId: body.email || 'anonymous', email: body.email, context: 'verify_email' });
+    trackServer(EVENTS.OTP_RESENT, { email: body.email, context: 'verify_email' });
     // Always generic — never reveals whether the account exists / is verified.
     return NextResponse.json({ ok: true, message: 'If your account needs verification, a new code is on its way.' });
   } catch (err) {

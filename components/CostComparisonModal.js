@@ -23,10 +23,10 @@ const SUGGEST_ICON = {
   tradeoff: Scale, framing: Scale, recommendation: Lightbulb, default: Info,
 };
 
-function GroupCell({ label, group }) {
+function GroupCell({ label, group, currency }) {
   const val = !group ? '—'
-    : group.has_unpriced ? (group.known ? `${money(group.known)}+` : '?')
-    : money(group.known);
+    : group.has_unpriced ? (group.known ? `${money(group.known, currency)}+` : '?')
+    : money(group.known, currency);
   return (
     <div className="rounded-md bg-muted/40 px-1 py-1">
       <div className="text-[8.5px] uppercase tracking-wide text-muted-foreground">{label}</div>
@@ -35,10 +35,21 @@ function GroupCell({ label, group }) {
   );
 }
 
-function money(n) {
+// Locale-aware currency formatting driven by the estimate's own `currency`
+// (defaults to USD). Sub-dollar amounts (e.g. per-task prices) keep 4 dp.
+function money(n, currency = 'USD') {
   if (n == null) return null;
-  if (n === 0) return '$0';
-  return n < 1 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+  const digits = n !== 0 && Math.abs(n) < 1 ? 4 : 2;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency', currency,
+      minimumFractionDigits: n === 0 ? 0 : digits,
+      maximumFractionDigits: digits,
+    }).format(n);
+  } catch {
+    // Unknown/invalid currency code → plain number + code rather than throw.
+    return `${n.toFixed(digits)} ${currency}`;
+  }
 }
 
 function ConfidenceBadge({ value }) {
@@ -59,11 +70,12 @@ function fmtDate(v) {
  */
 function CostHeadline({ est }) {
   const known = est.known_monthly_cost;
+  const cur = est.currency || 'USD';
   return (
     <div>
       {known != null ? (
         <div className="flex items-baseline gap-1.5">
-          <span className="text-lg font-semibold text-foreground">{money(known)}</span>
+          <span className="text-lg font-semibold text-foreground">{money(known, cur)}</span>
           <span className="text-[11px] text-muted-foreground">known/mo</span>
         </div>
       ) : (
@@ -74,9 +86,9 @@ function CostHeadline({ est }) {
           it's partial and refuse to show a headline number — no fake precision. */}
       {est.estimated_total != null ? (
         est.total_is_partial ? (
-          <p className="mt-0.5 text-[11px] text-amber-500">Core priced (~{money(est.estimated_total)}/mo); storage/human costs not included.</p>
+          <p className="mt-0.5 text-[11px] text-amber-500">Core priced (~{money(est.estimated_total, cur)}/mo); storage/human costs not included.</p>
         ) : (
-          <p className="mt-0.5 text-[11px] text-green-500">Complete estimate — ~{money(est.estimated_total)}/mo.</p>
+          <p className="mt-0.5 text-[11px] text-green-500">Complete estimate — ~{money(est.estimated_total, cur)}/mo.</p>
         )
       ) : (
         <p className="mt-0.5 text-[11px] text-amber-500">
@@ -110,9 +122,9 @@ function PlatformCard({ est }) {
 
         {/* Platform cost vs. total automation cost — not a single headline. */}
         <div className="mt-2 grid grid-cols-3 gap-1 text-center" title="Known monthly cost by group ( + means unpriced extras exist )">
-          <GroupCell label="Platform" group={est.cost_groups?.platform} />
-          <GroupCell label="Operational" group={est.cost_groups?.operational} />
-          <GroupCell label="Usage" group={est.cost_groups?.usage} />
+          <GroupCell label="Platform" group={est.cost_groups?.platform} currency={est.currency} />
+          <GroupCell label="Operational" group={est.cost_groups?.operational} currency={est.currency} />
+          <GroupCell label="Usage" group={est.cost_groups?.usage} currency={est.currency} />
         </div>
         {est.tradeoff?.responsibility && (
           <p className="mt-2 text-[10px] italic leading-snug text-muted-foreground">⤷ {est.tradeoff.responsibility}</p>
@@ -134,7 +146,7 @@ function PlatformCard({ est }) {
               </span>
               <span className="shrink-0 text-right text-[11px]">
                 {c.line_cost != null
-                  ? <span className={cn(c.line_cost === 0 ? 'text-green-500' : 'text-foreground')}>{money(c.line_cost)}</span>
+                  ? <span className={cn(c.line_cost === 0 ? 'text-green-500' : 'text-foreground')}>{money(c.line_cost, est.currency)}</span>
                   : <span className="text-muted-foreground">—</span>}
               </span>
             </div>
@@ -226,6 +238,18 @@ export default function CostComparisonModal({ open, onOpenChange, blueprintId })
         </DialogHeader>
 
         <div className="max-h-[75vh] overflow-y-auto scrollbar-thin px-6 py-5">
+          {/* Historical-version notice — an old estimate must never read as the
+              current Blueprint's. */}
+          {data && data.is_current === false && (
+            <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12px] leading-snug text-foreground">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <span>
+                This cost estimate is for <span className="font-semibold">Blueprint v{data.blueprint_version}</span>, not the latest{' '}
+                <span className="font-semibold">v{data.current_version}</span>. Numbers reflect the older version.
+              </span>
+            </div>
+          )}
+
           {/* Volume control */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">Monthly volume:</span>

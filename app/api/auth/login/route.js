@@ -4,6 +4,7 @@ import { setSessionCookie } from '../../../../lib/auth/session.js';
 import { withRateLimit } from '../../../../lib/auth/rateLimit.js';
 import { authErrorResponse } from '../../../../lib/auth/routeHelpers.js';
 import { trackServer, setPerson } from '../../../../lib/analytics/server.js';
+import { errorCategory } from '../../../../lib/analytics/sanitize.js';
 import { EVENTS } from '../../../../lib/analytics/events.js';
 
 export const dynamic = 'force-dynamic';
@@ -17,17 +18,17 @@ export async function POST(request) {
       () => login(body)
     );
     setSessionCookie(userId);
-    trackServer(EVENTS.LOGGED_IN, { distinctId: userId, email: body.email });
+    trackServer(EVENTS.LOGGED_IN, { userId });
     setPerson(userId, { $email: body.email });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    // Keyed by email so failed attempts stitch to the eventual login. A 403 is
-    // "email not verified" (a real user), 429 is throttling — both worth seeing.
+    // Pre-auth: the email is pseudonymized (HMAC) into the distinct_id so the
+    // funnel stitches to the eventual login without exposing the address, and
+    // the raw error is reduced to a category. 403 = unverified, 429 = throttled.
     trackServer(EVENTS.LOGIN_FAILED, {
-      distinctId: body.email || 'anonymous',
       email: body.email,
-      reason: err?.message,
-      status: err?.statusCode || 401,
+      status_code: err?.statusCode || 401,
+      error_category: errorCategory(err?.statusCode || 401),
       rate_limited: err?.statusCode === 429,
       needs_verification: err?.statusCode === 403,
     });
