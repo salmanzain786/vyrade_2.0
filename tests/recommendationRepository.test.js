@@ -46,6 +46,22 @@ describe('saveRecommendation — persist with timestamp + input version', () => 
     expect(query).toHaveBeenCalledTimes(2); // lookup + insert
   });
 
+  it('inserts a new run when only the volume (monthly_runs) differs', async () => {
+    query
+      .mockResolvedValueOnce([[{ id: 'old', generated_at: new Date(), recommended_platform: 'n8n_cloud', confidence: 'high', engine_version: 'rules-v1', monthly_runs: 5000 }]])
+      .mockResolvedValueOnce([{}]);
+    const r = await repo.saveRecommendation({ blueprintId: 'bp1', blueprintVersion: 3, recommendation: rec(), monthlyRuns: 10000 });
+    expect(r.stored).toBe(true);        // different input → distinct run
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it('stays idempotent when monthly_runs also matches', async () => {
+    query.mockResolvedValueOnce([[{ id: 'existing', generated_at: new Date(), recommended_platform: 'n8n_cloud', confidence: 'high', engine_version: 'rules-v1', monthly_runs: 5000 }]]);
+    const r = await repo.saveRecommendation({ blueprintId: 'bp1', blueprintVersion: 3, recommendation: rec(), monthlyRuns: 5000 });
+    expect(r.stored).toBe(false);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it('requires the core inputs', async () => {
     await expect(repo.saveRecommendation({ recommendation: rec() })).rejects.toThrow(/required/);
   });

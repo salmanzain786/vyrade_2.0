@@ -107,6 +107,12 @@ export default function GuidedBuildModal({
   function goBuild() {
     setStep(2);
     track(EVENTS.GUIDED_BUILD_STEP, { blueprint_id: blueprintId, step: 'build' });
+    // Persist the recommendation the user is committing to build from, BEFORE
+    // the build — so export provenance is saved even under strict enforcement.
+    // Fire-and-forget: build-time ensureRecommendation is the backstop.
+    fetch(`/api/blueprints/${blueprintId}/recommendation`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }).catch(() => {});
   }
 
   const readinessOf = (key) => platformReadiness?.[key] ?? (key === 'n8n' || key === 'claude' ? 'full' : 'coming_soon');

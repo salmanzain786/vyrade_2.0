@@ -279,6 +279,7 @@ export default function ChatWorkspace({ sessionId, user }) {
       setWorkflowStale(false);
       setShowWorkflow(true);
       setMessages((prev) => [...prev, { role: 'system', content: 'Generated n8n workflow.' }]);
+      if (genData.export_warning) toast.warning(genData.export_warning);
       // Server fires the authoritative "Workflow Generated" with node/token/cost
       // detail; this client event carries the user-perceived latency.
       track(EVENTS.WORKFLOW_VIEWED, {
@@ -334,6 +335,8 @@ export default function ChatWorkspace({ sessionId, user }) {
           ? `${platform} implementation guide downloaded${grounded === 'false' ? ' (generic)' : ''}`
           : 'Package downloaded'
       );
+      const exportWarning = res.headers.get('X-Export-Warning');
+      if (exportWarning) toast.warning(exportWarning);
     } catch (err) {
       track(EVENTS.EXPORT_FAILED, { blueprint_id: blueprintId, platform, error: err.message });
       toast.error(err.message);

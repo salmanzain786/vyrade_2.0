@@ -51,6 +51,7 @@ export default async function TechnologyPage({ params, searchParams }) {
     ? await getTopWorkflows(platform, { category: activeCategory, limit: 24 })
     : overview.top_workflows;
   const label = overview.platform_label;
+  const others = ['n8n', 'make', 'zapier', 'claude'].filter((p) => p !== platform);
 
   return (
     <div className="min-h-screen bg-background">
@@ -68,8 +69,9 @@ export default async function TechnologyPage({ params, searchParams }) {
           <div className="flex items-start gap-4">
             <PlatformChip platform={platform} className="mt-1 h-12 w-12" />
             <div>
-              <h1 className="text-3xl font-bold text-foreground sm:text-4xl">{label} automation</h1>
-              {pos.tagline && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">{pos.tagline}</p>}
+              <h1 className="text-3xl font-bold text-foreground sm:text-4xl">{pos.headline}</h1>
+              {pos.tagline && <p className="mt-2 max-w-2xl text-[15px] font-medium leading-relaxed text-foreground/80">{pos.tagline}</p>}
+              {pos.intro && <p className="mt-3 max-w-2xl text-[13.5px] leading-relaxed text-muted-foreground">{pos.intro}</p>}
               <div className="mt-5"><BuildCTA /></div>
             </div>
           </div>
@@ -207,13 +209,36 @@ export default async function TechnologyPage({ params, searchParams }) {
           </section>
         )}
 
+        {/* Compare with other platforms — internal linking */}
+        <section className="border-b border-border py-10">
+          <H2>Compare {label} with other platforms</H2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {others.map((p) => {
+              const op = getPlatformPositioning(p);
+              return (
+                <Link key={p} href={`/technology/${p}`} className="group rounded-xl border border-border bg-card p-4 transition-all hover:border-blue-500/50 hover:shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <PlatformChip platform={p} />
+                    <span className="font-medium text-foreground group-hover:text-blue-500">{platformLabel(p)}</span>
+                    <ArrowRight className="ml-auto h-3.5 w-3.5 -translate-x-1 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                  </div>
+                  {op?.tagline && <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">{op.tagline}</p>}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+
         {/* Final CTA */}
         <section className="py-14 text-center">
-          <h2 className="text-2xl font-bold text-foreground">Not sure {label} is the right choice?</h2>
-          <p className="mx-auto mt-2 max-w-xl text-[14px] leading-relaxed text-muted-foreground">
-            Describe your outcome. Vyrade drafts the Automation Blueprint, recommends the best architecture across n8n, Make, Zapier and Claude Code, and compares the real cost — then builds it.
+          <h2 className="text-2xl font-bold text-foreground sm:text-3xl">Not sure {label} is the right choice?</h2>
+          <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
+            Don&apos;t guess. Describe your outcome and Vyrade drafts the Automation Blueprint, recommends the best architecture across n8n, Make, Zapier and Claude Code, compares the real monthly cost — then builds the workflow for you.
           </p>
-          <div className="mt-5 flex justify-center"><BuildCTA /></div>
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <BuildCTA />
+            <Link href="/" className="text-[13px] font-medium text-blue-500 hover:underline">Get a free Automation Blueprint →</Link>
+          </div>
         </section>
       </main>
 

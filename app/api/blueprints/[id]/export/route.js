@@ -4,6 +4,7 @@ import { runPlatformExport, UnsupportedPlatformError } from '../../../../../lib/
 import { getVersion, getLatest } from '../../../../../lib/services/blueprintRepository.js';
 import { ensureRecommendation } from '../../../../../lib/services/recommendation/recommendationRepository.js';
 import { recordExportRun } from '../../../../../lib/services/recommendation/exportRunRepository.js';
+import { isStrictRecommendationEnforced } from '../../../../../lib/services/recommendation/enforcement.js';
 import { withAuth } from '../../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
 import { trackServer } from '../../../../../lib/analytics/server.js';
@@ -30,11 +31,23 @@ export const POST = withAuth(async (user, request, { params }) => {
   }
 
   // Architecture-first: ensure a recommendation exists for this Blueprint
-  // version before exporting. Best-effort — never blocks the export.
+  // version before exporting.
   const record = body.version ? await getVersion(params.id, Number(body.version)).catch(() => null) : await getLatest(params.id).catch(() => null);
+  const isComplete = (record?.status ?? record?.readiness?.status) === 'requirements_complete';
   const recommendation = record?.blueprint
     ? await ensureRecommendation({ blueprintId: params.id, blueprintVersion: record.version, userId: user.id, blueprint: record.blueprint }).catch(() => null)
     : null;
+
+  // Enforcement: a COMPLETE Blueprint must have a persisted recommendation
+  // before a real export. STRICT mode blocks; otherwise proceed with a warning.
+  const missingProvenance = body.part !== 'prompt' && isComplete && !recommendation?.id;
+  if (missingProvenance && isStrictRecommendationEnforced()) {
+    return NextResponse.json(
+      { error: 'Cannot export yet: an architecture recommendation could not be created for this Blueprint. Please try again in a moment.' },
+      { status: 409 }
+    );
+  }
+  const exportWarning = missingProvenance ? 'Export completed without saved recommendation provenance.' : null;
 
   const result = await runPlatformExport({
     blueprintId: params.id,
@@ -63,7 +76,11 @@ export const POST = withAuth(async (user, request, { params }) => {
     });
   }
 
-  const recRef = { recommendation_id: recommendation?.id ?? null, recommended_platform: recommendation?.export_platform ?? null };
+  const recRef = {
+    recommendation_id: recommendation?.id ?? null,
+    recommended_platform: recommendation?.export_platform ?? null,
+    ...(exportWarning ? { export_warning: exportWarning } : {}),
+  };
 
   if (result.kind === 'workflow') {
     return NextResponse.json({ platform: result.platform, readiness: result.readiness, workflow: result.workflow, ...recRef });
@@ -86,6 +103,7 @@ export const POST = withAuth(async (user, request, { params }) => {
       'X-Export-Grounded': String(result.grounded ?? ''),
       'X-Recommendation-Id': recRef.recommendation_id || '',
       'X-Recommended-Platform': recRef.recommended_platform || '',
+      'X-Export-Warning': exportWarning || '',
       'Cache-Control': 'no-store',
     },
   });

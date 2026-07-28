@@ -37,28 +37,38 @@ describe('ensureRecommendation — architecture-first guarantee', () => {
 describe('recordExportRun — export provenance stamp', () => {
   beforeEach(() => query.mockReset().mockResolvedValue([{}]));
 
-  it('marks followed_recommendation=1 when the built platform matches the recommendation', async () => {
-    await recordExportRun({
+  it('following the recommendation → followed=1, NOT an override', async () => {
+    const r = await recordExportRun({
       blueprintId: 'bp1', blueprintVersion: 3, userId: 'u1', selectedPlatform: 'n8n', kind: 'workflow',
       recommendation: { id: 'r1', export_platform: 'n8n', recommended_platform: 'n8n_cloud' },
     });
     const params = query.mock.calls[0][1];
     expect(params).toContain('r1');   // recommendation_id stamped
-    expect(params).toContain('n8n');  // selected platform
     expect(params[8]).toBe(1);        // followed_recommendation
+    expect(params[9]).toBe(0);        // is_recommendation_override
+    expect(params[10]).toBeNull();    // override_reason
+    expect(r.is_recommendation_override).toBe(0);
   });
 
-  it('marks followed_recommendation=0 when the user built off-recommendation', async () => {
-    await recordExportRun({
+  it('building OFF the recommendation → override flagged with a reason (the product signal)', async () => {
+    // Vyrade recommends n8n, the user exports Zapier.
+    const r = await recordExportRun({
       blueprintId: 'bp1', blueprintVersion: 3, selectedPlatform: 'zapier', kind: 'guide',
       recommendation: { id: 'r1', export_platform: 'n8n', recommended_platform: 'n8n_cloud' },
     });
-    expect(query.mock.calls[0][1][8]).toBe(0);
+    const params = query.mock.calls[0][1];
+    expect(params[8]).toBe(0);                      // followed_recommendation
+    expect(params[9]).toBe(1);                      // is_recommendation_override
+    expect(params[10]).toBe('user_selected_platform'); // override_reason
+    expect(r.override_reason).toBe('user_selected_platform');
   });
 
-  it('followed_recommendation is null when no recommendation is available', async () => {
+  it('override + followed are null when no recommendation is available', async () => {
     await recordExportRun({ blueprintId: 'bp1', blueprintVersion: 3, selectedPlatform: 'n8n', recommendation: null });
-    expect(query.mock.calls[0][1][8]).toBeNull();
+    const params = query.mock.calls[0][1];
+    expect(params[8]).toBeNull();   // followed_recommendation
+    expect(params[9]).toBeNull();   // is_recommendation_override
+    expect(params[10]).toBeNull();  // override_reason
   });
 
   it('never throws on a DB error', async () => {

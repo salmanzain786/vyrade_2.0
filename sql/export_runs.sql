@@ -10,10 +10,18 @@ CREATE TABLE IF NOT EXISTS export_runs (
   user_id                CHAR(36)     NULL,
   selected_platform      VARCHAR(32)  NOT NULL,       -- n8n | make | zapier | claude
   kind                   VARCHAR(16)  NULL,           -- workflow | package | guide
-  recommendation_id      CHAR(36)     NULL,           -- the recommendation this build followed
-  recommended_platform   VARCHAR(48)  NULL,           -- what was recommended
-  followed_recommendation TINYINT(1)  NULL,           -- selected matches recommended?
-  created_at             TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  recommendation_id       CHAR(36)     NULL,           -- the recommendation this build followed
+  recommended_platform    VARCHAR(48)  NULL,           -- what was recommended
+  followed_recommendation TINYINT(1)   NULL,           -- selected matches recommended?
+  is_recommendation_override TINYINT(1) NULL,          -- user built something OTHER than recommended
+  override_reason         VARCHAR(48)  NULL,           -- e.g. user_selected_platform
+  created_at              TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_export_blueprint (blueprint_id, created_at),
-  INDEX idx_export_recommendation (recommendation_id)
+  INDEX idx_export_recommendation (recommendation_id),
+  INDEX idx_export_override (is_recommendation_override, created_at)
 ) ENGINE=InnoDB;
+
+-- Add the override columns to an already-created table (tolerant migration
+-- ignores "duplicate column" when they already exist from the CREATE above).
+ALTER TABLE export_runs ADD COLUMN is_recommendation_override TINYINT(1) NULL AFTER followed_recommendation;
+ALTER TABLE export_runs ADD COLUMN override_reason VARCHAR(48) NULL AFTER is_recommendation_override;

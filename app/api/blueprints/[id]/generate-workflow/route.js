@@ -3,6 +3,7 @@ import { generateWorkflow } from '../../../../../lib/services/blueprintService.j
 import { getBlueprintSessionId, getVersion } from '../../../../../lib/services/blueprintRepository.js';
 import { ensureRecommendation } from '../../../../../lib/services/recommendation/recommendationRepository.js';
 import { recordExportRun } from '../../../../../lib/services/recommendation/exportRunRepository.js';
+import { isStrictRecommendationEnforced } from '../../../../../lib/services/recommendation/enforcement.js';
 import { addMessage } from '../../../../../lib/services/conversationRepository.js';
 import { withAuth } from '../../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
@@ -21,11 +22,23 @@ export const POST = withAuth(async (user, request, { params }) => {
   const v = Number(version);
 
   // Architecture-first: guarantee a recommendation exists for this version
-  // BEFORE building. Best-effort — never blocks generation.
+  // BEFORE building.
   const record = await getVersion(params.id, v).catch(() => null);
+  const isComplete = (record?.status ?? record?.readiness?.status) === 'requirements_complete';
   const recommendation = record?.blueprint
     ? await ensureRecommendation({ blueprintId: params.id, blueprintVersion: v, userId: user.id, blueprint: record.blueprint }).catch(() => null)
     : null;
+
+  // Enforcement: a COMPLETE Blueprint must have a persisted recommendation
+  // before a final build. STRICT mode (production) blocks; otherwise we proceed
+  // but surface an `export_warning` so provenance loss is never silent.
+  const missingProvenance = isComplete && !recommendation?.id;
+  if (missingProvenance && isStrictRecommendationEnforced()) {
+    return NextResponse.json(
+      { error: 'Cannot build yet: an architecture recommendation could not be created for this Blueprint. Please try again in a moment.' },
+      { status: 409 }
+    );
+  }
 
   let workflow, usage;
   try {
@@ -110,5 +123,6 @@ export const POST = withAuth(async (user, request, { params }) => {
     recommendation_id: recommendation?.id ?? null,
     recommended_platform: recommendation?.export_platform ?? null,
     selected_platform: 'n8n',
+    export_warning: missingProvenance ? 'Workflow generated without saved recommendation provenance.' : undefined,
   });
 });
