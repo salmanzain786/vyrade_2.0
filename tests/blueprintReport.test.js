@@ -46,10 +46,24 @@ describe('generateBlueprintReport — the customer deliverable', () => {
     expect(report.sections.business_problem.summary.toLowerCase()).toContain('lead');
   });
 
-  it('lists the current manual process steps', async () => {
+  it('lists the process steps and does NOT assume they are manual by default', async () => {
     const report = await generateBlueprintReport({ blueprint: baseBlueprint() });
     expect(report.sections.current_process.steps.length).toBeGreaterThan(0);
-    expect(report.sections.current_process.note).toMatch(/manually/i);
+    // Default (no current_process_type) → neutral wording, not "manually".
+    expect(report.sections.current_process.process_type).toBe('unknown');
+    expect(report.sections.current_process.note).not.toMatch(/manually/i);
+    expect(report.sections.current_process.note).toMatch(/current or intended/i);
+  });
+
+  it('honors current_process_type when the Blueprint states it', async () => {
+    const migration = await generateBlueprintReport({ blueprint: baseBlueprint({ current_process_type: 'migration' }) });
+    expect(migration.sections.current_process.process_type).toBe('migration');
+    expect(migration.sections.current_process.note).toMatch(/migrat/i);
+    expect(migration.sections.current_process.heading).toMatch(/migration/i);
+
+    const manual = await generateBlueprintReport({ blueprint: baseBlueprint({ current_process_type: 'manual' }) });
+    expect(manual.sections.current_process.note).toMatch(/manually/i);
+    expect(manual.sections.current_process.heading).toBe('Current manual process');
   });
 
   it('enriches systems with auth / complexity / security from tool intelligence', async () => {
@@ -98,6 +112,23 @@ describe('generateBlueprintReport — the customer deliverable', () => {
     expect(titles).toMatch(/AI steps/);
     expect(titles).toMatch(/Human approval/);
     expect(report.sections.human_approval_points.points).toContain('Manager approves refunds');
+  });
+
+  it('does NOT crash on a scalar condition value (real Blueprints aren\'t always arrays)', async () => {
+    const bp = baseBlueprint({
+      business_rules: [
+        { rule_id: 'r1', description: 'West coast only', condition: { field: 'state', operator: 'equals', value: 'California' }, result: { action: 'route', value: 'west' } },
+        { rule_id: 'r2', description: 'Multi', condition: { field: 'state', operator: 'in', value: ['California', 'Texas'] }, result: { action: 'route', value: 'south' } },
+        { rule_id: 'r3', description: 'Null value', condition: { field: 'flag', operator: 'exists', value: null }, result: { action: 'x', value: 'y' } },
+      ],
+    });
+    // The bug: (r.condition.value || []).join() throws on a string.
+    const report = await generateBlueprintReport({ blueprint: bp });
+    const [a, b, c] = report.sections.business_rules.rules;
+    expect(a.condition).toBe('state equals California');   // scalar renders correctly
+    expect(b.condition).toBe('state in California, Texas'); // array still works
+    expect(c.condition).toBe('flag exists');               // null → no trailing junk
+    expect(a.result).toBe('route: west');
   });
 
   it('produces security notes and next steps', async () => {

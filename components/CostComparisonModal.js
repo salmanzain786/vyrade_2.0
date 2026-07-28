@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { PlatformChip, PLATFORMS } from '@/components/PlatformIcons';
-import { cn } from '@/lib/utils';
+import { cn, formatMoney as money } from '@/lib/utils';
 
 const CONF = {
   high: { label: 'High', cls: 'bg-green-500/10 text-green-500 border-green-500/20' },
@@ -33,23 +33,6 @@ function GroupCell({ label, group, currency }) {
       <div className="text-[11px] font-medium text-foreground">{val}</div>
     </div>
   );
-}
-
-// Locale-aware currency formatting driven by the estimate's own `currency`
-// (defaults to USD). Sub-dollar amounts (e.g. per-task prices) keep 4 dp.
-function money(n, currency = 'USD') {
-  if (n == null) return null;
-  const digits = n !== 0 && Math.abs(n) < 1 ? 4 : 2;
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency', currency,
-      minimumFractionDigits: n === 0 ? 0 : digits,
-      maximumFractionDigits: digits,
-    }).format(n);
-  } catch {
-    // Unknown/invalid currency code → plain number + code rather than throw.
-    return `${n.toFixed(digits)} ${currency}`;
-  }
 }
 
 function ConfidenceBadge({ value }) {

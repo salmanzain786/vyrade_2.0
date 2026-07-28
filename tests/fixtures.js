@@ -8,6 +8,7 @@ export function baseBlueprint(overrides = {}) {
       business_goal: 'Capture every web lead in the CRM',
       desired_outcome: 'No lead is lost',
     },
+    current_process_type: 'unknown',
     trigger: {
       trigger_type: 'event',
       event: 'new_web_lead',

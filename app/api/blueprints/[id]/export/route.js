@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import { runPlatformExport, UnsupportedPlatformError } from '../../../../../lib/services/exportService.js';
+import { getVersion, getLatest } from '../../../../../lib/services/blueprintRepository.js';
+import { ensureRecommendation } from '../../../../../lib/services/recommendation/recommendationRepository.js';
+import { recordExportRun } from '../../../../../lib/services/recommendation/exportRunRepository.js';
 import { withAuth } from '../../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
 import { trackServer } from '../../../../../lib/analytics/server.js';
@@ -26,6 +29,13 @@ export const POST = withAuth(async (user, request, { params }) => {
     throw new UnsupportedPlatformError('Select an export platform (n8n, claude, make, or zapier).');
   }
 
+  // Architecture-first: ensure a recommendation exists for this Blueprint
+  // version before exporting. Best-effort — never blocks the export.
+  const record = body.version ? await getVersion(params.id, Number(body.version)).catch(() => null) : await getLatest(params.id).catch(() => null);
+  const recommendation = record?.blueprint
+    ? await ensureRecommendation({ blueprintId: params.id, blueprintVersion: record.version, userId: user.id, blueprint: record.blueprint }).catch(() => null)
+    : null;
+
   const result = await runPlatformExport({
     blueprintId: params.id,
     version: body.version ? Number(body.version) : null,
@@ -46,14 +56,21 @@ export const POST = withAuth(async (user, request, { params }) => {
       grounded: result.grounded ?? null,
       file_count: result.files ? Object.keys(result.files).length : null,
     });
+    // Stamp export provenance with the recommendation it followed.
+    await recordExportRun({
+      blueprintId: params.id, blueprintVersion: record?.version, userId: user.id,
+      selectedPlatform: result.platform, kind: result.kind, recommendation,
+    });
   }
 
+  const recRef = { recommendation_id: recommendation?.id ?? null, recommended_platform: recommendation?.export_platform ?? null };
+
   if (result.kind === 'workflow') {
-    return NextResponse.json({ platform: result.platform, readiness: result.readiness, workflow: result.workflow });
+    return NextResponse.json({ platform: result.platform, readiness: result.readiness, workflow: result.workflow, ...recRef });
   }
 
   if (body.part === 'prompt' && result.prompt) {
-    return NextResponse.json({ platform: result.platform, prompt: result.prompt, files: Object.keys(result.files || {}) });
+    return NextResponse.json({ platform: result.platform, prompt: result.prompt, files: Object.keys(result.files || {}), ...recRef });
   }
 
   const zip = new JSZip();
@@ -67,6 +84,8 @@ export const POST = withAuth(async (user, request, { params }) => {
       'Content-Disposition': `attachment; filename="${slug(result.name)}-${result.platform}-${suffix}.zip"`,
       'X-Export-Readiness': result.readiness || '',
       'X-Export-Grounded': String(result.grounded ?? ''),
+      'X-Recommendation-Id': recRef.recommendation_id || '',
+      'X-Recommended-Platform': recRef.recommended_platform || '',
       'Cache-Control': 'no-store',
     },
   });

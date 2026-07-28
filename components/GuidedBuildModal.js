@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  Loader2, ArrowRight, ArrowLeft, Check, Sparkles, Eye, Download, RefreshCw, CheckCircle2, Lightbulb,
+  Loader2, ArrowRight, ArrowLeft, Check, Sparkles, Eye, Download, RefreshCw, CheckCircle2, Lightbulb, AlertTriangle,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -14,7 +14,7 @@ import { READINESS_LABEL } from '@/lib/exporters/registry';
 import GenerationLoader from '@/components/chat/GenerationLoader';
 import { track } from '@/lib/analytics/mixpanel';
 import { EVENTS } from '@/lib/analytics/events';
-import { cn } from '@/lib/utils';
+import { cn, formatMoney } from '@/lib/utils';
 
 const STEPS = ['Recommendation', 'Cost', 'Build'];
 const BUILD_TARGETS = [
@@ -29,7 +29,7 @@ const CONF = {
   low: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
   unknown: 'bg-muted text-muted-foreground border-border',
 };
-const money = (n, c = 'USD') => (n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c, maximumFractionDigits: n < 1 && n !== 0 ? 4 : 2 }).format(n));
+const money = (n, c) => formatMoney(n, c) ?? '—';
 
 function Stepper({ step }) {
   return (
@@ -139,6 +139,12 @@ export default function GuidedBuildModal({
           {/* STEP 1 — Recommendation */}
           {step === 0 && rec && !loading && (
             <div>
+              {rec.warning && (
+                <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12px] text-foreground">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <span>{rec.warning}</span>
+                </div>
+              )}
               <div className="rounded-xl border border-blue-500/30 bg-blue-500/[0.04] p-4">
                 <div className="flex items-center gap-2.5">
                   {recExport && <PlatformChip platform={recExport} />}

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { generateWorkflow } from '../../../../../lib/services/blueprintService.js';
-import { getBlueprintSessionId } from '../../../../../lib/services/blueprintRepository.js';
+import { getBlueprintSessionId, getVersion } from '../../../../../lib/services/blueprintRepository.js';
+import { ensureRecommendation } from '../../../../../lib/services/recommendation/recommendationRepository.js';
+import { recordExportRun } from '../../../../../lib/services/recommendation/exportRunRepository.js';
 import { addMessage } from '../../../../../lib/services/conversationRepository.js';
 import { withAuth } from '../../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
@@ -16,9 +18,18 @@ export const POST = withAuth(async (user, request, { params }) => {
   await assertBlueprintOwner(user, params.id);
 
   const { version } = await request.json();
+  const v = Number(version);
+
+  // Architecture-first: guarantee a recommendation exists for this version
+  // BEFORE building. Best-effort — never blocks generation.
+  const record = await getVersion(params.id, v).catch(() => null);
+  const recommendation = record?.blueprint
+    ? await ensureRecommendation({ blueprintId: params.id, blueprintVersion: v, userId: user.id, blueprint: record.blueprint }).catch(() => null)
+    : null;
+
   let workflow, usage;
   try {
-    ({ workflow, usage } = await generateWorkflow({ blueprintId: params.id, version: Number(version) }));
+    ({ workflow, usage } = await generateWorkflow({ blueprintId: params.id, version: v }));
   } catch (err) {
     // Operational Insights: capture generation failures (category only, no PII).
     recordEvent({
@@ -87,5 +98,17 @@ export const POST = withAuth(async (user, request, { params }) => {
     recordEvent({ eventType: OPS_EVENTS.IMPORT_SKIPPED, platform: 'n8n', blueprintId: params.id, userId: user.id });
   }
 
-  return NextResponse.json({ workflow, usage });
+  // Stamp this build with the recommendation it followed (export provenance).
+  await recordExportRun({
+    blueprintId: params.id, blueprintVersion: v, userId: user.id,
+    selectedPlatform: 'n8n', kind: 'workflow', recommendation,
+  });
+
+  return NextResponse.json({
+    workflow,
+    usage,
+    recommendation_id: recommendation?.id ?? null,
+    recommended_platform: recommendation?.export_platform ?? null,
+    selected_platform: 'n8n',
+  });
 });

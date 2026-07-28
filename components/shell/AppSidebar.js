@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useTheme } from 'next-themes';
 import { Plus, History, User, LogOut, Sun, Moon, Search, MessageSquare } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatMoney } from '@/lib/utils';
 import { VyradeMark } from '@/components/VyradeLogo';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -19,8 +19,8 @@ const mobileNavItemClass =
 
 function formatCost(v) {
   const n = Number(v);
-  if (!n) return null;
-  return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+  if (!n) return null;                 // hide a zero cost
+  return formatMoney(n, 'USD');        // shared, locale-aware, USD-preserving
 }
 
 export default function AppSidebar({ user, conversations = [], currentSessionId, onNewChat, onSelect }) {

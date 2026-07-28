@@ -56,6 +56,8 @@ async function migrate() {
   await runFile(connection, 'workflow_encyclopedia.sql', { tolerant: true });
   await runFile(connection, 'tool_intelligence.sql', { tolerant: true });
   await runFile(connection, 'operational_events.sql', { tolerant: true });
+  await runFile(connection, 'recommendations.sql', { tolerant: true });
+  await runFile(connection, 'export_runs.sql', { tolerant: true });
 
   console.log('Migration applied successfully.');
   await connection.end();

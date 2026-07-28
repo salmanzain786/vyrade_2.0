@@ -8,6 +8,23 @@ import {
   checkNeutrality,
 } from '../lib/schema/blueprintSchema.js';
 
+describe('current_process_type — captures the process state (no "manual" assumption)', () => {
+  it('accepts every valid state', () => {
+    for (const t of ['manual', 'partially_automated', 'existing_workflow', 'migration', 'unknown']) {
+      expect(() => validateBlueprint(baseBlueprint({ current_process_type: t }))).not.toThrow();
+    }
+  });
+
+  it('is a required field (present on the base fixture)', () => {
+    const { current_process_type, ...withoutIt } = baseBlueprint();
+    expect(() => validateBlueprint(withoutIt)).toThrow(/current_process_type/);
+  });
+
+  it('rejects an out-of-enum value', () => {
+    expect(() => validateBlueprint(baseBlueprint({ current_process_type: 'semi' }))).toThrow();
+  });
+});
+
 describe('QA case 4 — contradictory business rules', () => {
   const rule = (id, action, val) => ({
     rule_id: id,

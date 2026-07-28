@@ -4,6 +4,7 @@
     "business_goal": "Record every new Shopify order in a central Google Sheet and notify the sales team in Slack.",
     "desired_outcome": "Each new Shopify order creates a new row in the designated Google Sheet and a message is posted to #sales. If the sheet write ultimately fails, the team is notified in Slack."
   },
+  "current_process_type": "unknown",
   "trigger": {
     "trigger_type": "event",
     "event": "new_order_created",

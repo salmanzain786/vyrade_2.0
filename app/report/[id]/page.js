@@ -6,7 +6,7 @@ import { getLatest } from '@/lib/services/blueprintRepository.js';
 import { generateBlueprintReport } from '@/lib/services/report/blueprintReport.js';
 import { VyradeMark } from '@/components/VyradeLogo';
 import PrintButton from '@/components/report/PrintButton';
-import { cn } from '@/lib/utils';
+import { cn, formatMoney } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ const RISK = {
   medium: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
   low: 'bg-green-500/10 text-green-500 border-green-500/20',
 };
-const money = (n, c = 'USD') => (n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c, maximumFractionDigits: n < 1 && n !== 0 ? 4 : 2 }).format(n));
+const money = (n, c) => formatMoney(n, c) ?? '—';
 
 function Section({ n, title, children }) {
   return (
@@ -68,8 +68,8 @@ export default async function ReportPage({ params }) {
           <p>{s.business_problem.summary}</p>
         </Section>
 
-        {/* 2. Current manual process */}
-        <Section n="2" title="Current manual process">
+        {/* 2. Current / intended process (may not be manual) */}
+        <Section n="2" title={s.current_process.heading || 'Current / intended process'}>
           <p className="mb-2 text-muted-foreground">{s.current_process.note}</p>
           {s.current_process.steps.length > 0 && (
             <ol className="list-decimal space-y-1 pl-5">{s.current_process.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
