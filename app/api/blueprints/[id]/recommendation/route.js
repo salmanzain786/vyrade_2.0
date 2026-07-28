@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getLatest, getVersion } from '../../../../../lib/services/blueprintRepository.js';
-import { recommend } from '../../../../../lib/services/recommendation/recommendationEngine.js';
-import { saveRecommendation, getLatestRecommendation } from '../../../../../lib/services/recommendation/recommendationRepository.js';
+import { recommend, ENGINE_VERSION } from '../../../../../lib/services/recommendation/recommendationEngine.js';
+import { saveRecommendation, getRecommendationByInput } from '../../../../../lib/services/recommendation/recommendationRepository.js';
 import { parseVolumeOverride, parseVersion } from '../../../../../lib/services/cost/costQuery.js';
 import { withAuth } from '../../../../../lib/auth/guard.js';
 import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
@@ -9,7 +9,6 @@ import { assertBlueprintOwner } from '../../../../../lib/auth/ownership.js';
 export const dynamic = 'force-dynamic';
 
 const DRAFT_WARNING = 'Blueprint is not complete yet — this is a draft recommendation and may change as requirements are finalized.';
-const nrun = (x) => (x == null ? null : Number(x));
 
 // Resolve the target Blueprint record + validate the shared query params.
 // Returns { record, isComplete, runs } or { error, status }.
@@ -41,9 +40,11 @@ export const GET = withAuth(async (user, request, { params }) => {
   const { record, runs, isComplete } = r;
   const meta = { current_version: record.current_version, is_current: record.is_current, mode: isComplete ? 'final' : 'draft_recommendation', warning: isComplete ? null : DRAFT_WARNING };
 
-  // Prefer the latest persisted run when it matches the requested input.
-  const saved = await getLatestRecommendation(params.id, record.version).catch(() => null);
-  if (saved && nrun(saved.monthly_runs) === nrun(runs)) {
+  // Prefer the persisted run for THIS EXACT input — (blueprint, version, engine,
+  // monthly_runs) — not merely the latest run. A saved 5000-run must still be
+  // returned even after a newer 10000-run becomes the latest.
+  const saved = await getRecommendationByInput(params.id, record.version, ENGINE_VERSION, runs).catch(() => null);
+  if (saved) {
     return NextResponse.json({ ...saved.recommendation, generated_at: saved.generated_at, recommendation_id: saved.id, persisted: true, ...meta });
   }
 
