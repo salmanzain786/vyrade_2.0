@@ -92,12 +92,14 @@ every push. Result is stamped on `workflow.meta.import_check`
 The workflow exists but must be enforced:
 **Settings → Branches → protect `main` → Require status checks → `test & build`.**
 
-### 4. Workflow-example coverage — **pending your data migration**
-Retrieval is wired and live, but the Pinecone index references more rows than
-`vyrade_blueprint.n8n_node_workflows` currently holds (~36% of matches hydrate
-today). Retrieval **over-fetches and skips** what it can't hydrate, so coverage
-improves automatically once you migrate the full data — **no code change**.
-`WORKFLOW_EXAMPLE_DB` / `WORKFLOW_EXAMPLE_TABLE` can re-point the source.
+### 4. Workflow-example coverage — **RESOLVED (data migrated)**
+`vyrade_blueprint.n8n_node_workflows` now holds the full dataset: **10,710 rows
+/ 10,647 with valid WORKFLOW_JSON**, matching the Pinecone workflow index's
+**10,647 vectors** exactly. A live end-to-end retrieval probe hydrates **100%**
+of Pinecone matches (was ~36%). No code change was needed — retrieval always
+over-fetched and skipped un-hydratable rows, so coverage rose automatically once
+the data landed. `WORKFLOW_EXAMPLE_DB` / `WORKFLOW_EXAMPLE_TABLE` can still
+re-point the source if the table ever moves.
 
 ### 5. Operational insights — **not yet a source**
 The remaining moat layer (run/failure telemetry feeding generation) has no index

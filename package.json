@@ -9,6 +9,7 @@
     "migrate": "node scripts/migrate.js",
     "migrate:verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/migrate.js && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-schema.js",
     "verify:schema": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-schema.js",
+    "check:config": "node scripts/check-prod-config.js",
     "smoke:n8n": "node scripts/n8n-smoke.js",
     "seed:pricing": "node scripts/seed-pricing.mjs",
     "curate:workflows": "node scripts/curate-workflows.mjs",
