@@ -9,6 +9,7 @@ import ChatMessage from '@/components/chat/ChatMessage';
 import Thinking from '@/components/chat/Thinking';
 import BlueprintSheet from '@/components/BlueprintSheet';
 import WorkflowModal from '@/components/WorkflowModal';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { VyradeMark } from '@/components/VyradeLogo';
 import { cn } from '@/lib/utils';
 import { track, identifyUser } from '@/lib/analytics/mixpanel';
@@ -456,30 +457,34 @@ export default function ChatWorkspace({ sessionId, user }) {
           {/* Blueprint right column — shown once a blueprint exists */}
           {blueprintId && (
             <aside className="hidden lg:flex w-[70%] xl:w-[70%] shrink-0 flex-col border-l border-border bg-card">
-              <BlueprintSheet
-                blueprint={blueprint}
-                readiness={readiness}
-                version={version}
-                blueprintId={blueprintId}
-                onGenerate={handleGenerate}
-                generating={generating}
-                workflow={workflow}
-                workflowStale={workflowStale}
-                onViewWorkflow={() => {
-                  track(EVENTS.WORKFLOW_VIEWED, { blueprint_id: blueprintId, source: 'view_button' });
-                  setShowWorkflow(true);
-                }}
-                onExportPlatform={handleExport}
-                onCopyPrompt={handleCopyClaudePrompt}
-                exportingPlatform={exportingPlatform}
-                platformReadiness={platformReadiness}
-              />
+              <ErrorBoundary name="blueprint-sheet">
+                <BlueprintSheet
+                  blueprint={blueprint}
+                  readiness={readiness}
+                  version={version}
+                  blueprintId={blueprintId}
+                  onGenerate={handleGenerate}
+                  generating={generating}
+                  workflow={workflow}
+                  workflowStale={workflowStale}
+                  onViewWorkflow={() => {
+                    track(EVENTS.WORKFLOW_VIEWED, { blueprint_id: blueprintId, source: 'view_button' });
+                    setShowWorkflow(true);
+                  }}
+                  onExportPlatform={handleExport}
+                  onCopyPrompt={handleCopyClaudePrompt}
+                  exportingPlatform={exportingPlatform}
+                  platformReadiness={platformReadiness}
+                />
+              </ErrorBoundary>
             </aside>
           )}
         </div>
       </div>
 
-      <WorkflowModal workflow={showWorkflow ? workflow : null} onClose={() => setShowWorkflow(false)} />
+      <ErrorBoundary name="workflow-modal">
+        <WorkflowModal workflow={showWorkflow ? workflow : null} onClose={() => setShowWorkflow(false)} />
+      </ErrorBoundary>
     </>
   );
 }
