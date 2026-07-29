@@ -25,3 +25,6 @@ CREATE TABLE IF NOT EXISTS export_runs (
 -- ignores "duplicate column" when they already exist from the CREATE above).
 ALTER TABLE export_runs ADD COLUMN is_recommendation_override TINYINT(1) NULL AFTER followed_recommendation;
 ALTER TABLE export_runs ADD COLUMN override_reason VARCHAR(48) NULL AFTER is_recommendation_override;
+-- Add the override index to an already-created table (tolerant migration
+-- ignores ER_DUP_KEYNAME when it already exists from the CREATE above).
+CREATE INDEX idx_export_override ON export_runs (is_recommendation_override, created_at);

@@ -29,13 +29,15 @@ describe('saveRecommendation — persist with timestamp + input version', () => 
     expect(insertParams).toContain('n8n_cloud');  // recommended_platform
   });
 
-  it('looks up an existing run by content hash, not by "latest"', async () => {
+  it('looks up an existing run by the full input key, not by "latest"', async () => {
     query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([{}]);
     await repo.saveRecommendation({ blueprintId: 'bp1', blueprintVersion: 3, recommendation: rec(), monthlyRuns: 5000 });
     const sql = query.mock.calls[0][0];
     const args = query.mock.calls[0][1];
-    expect(sql).toMatch(/recommendation_hash = \?/);   // WHERE filters by hash across ALL runs
-    expect(args).toEqual(['bp1', 3, repo.recommendationHash(rec(), 5000)]);
+    expect(sql).toMatch(/engine_version = \?/);        // engine in the key
+    expect(sql).toMatch(/monthly_runs <=> \?/);        // null-safe volume in the key
+    expect(sql).toMatch(/recommendation_hash = \?/);   // content hash — across ALL runs, not "latest"
+    expect(args).toEqual(['bp1', 3, 'rules-v1', 5000, repo.recommendationHash(rec(), 5000)]);
   });
 
   it('does NOT insert a duplicate when an identical-content run already exists', async () => {
@@ -48,12 +50,12 @@ describe('saveRecommendation — persist with timestamp + input version', () => 
 
   it('a 5k → 10k → 5k sequence does NOT re-insert the 5k duplicate', async () => {
     // The reviewer's exact scenario. On the 3rd save the LATEST run is the 10k
-    // one, but the hash lookup still finds the original 5k row → no duplicate.
+    // one, but the input-key lookup still finds the original 5k row → no dup.
     query.mockResolvedValueOnce([[{ id: 'r5000-original', generated_at: new Date('2026-07-27T00:00:00Z') }]]);
     const r = await repo.saveRecommendation({ blueprintId: 'bp1', blueprintVersion: 3, recommendation: rec(), monthlyRuns: 5000 });
     expect(r.stored).toBe(false);
     expect(r.id).toBe('r5000-original');   // returns the pre-existing 5k row
-    expect(query.mock.calls[0][1]).toEqual(['bp1', 3, repo.recommendationHash(rec(), 5000)]);
+    expect(query.mock.calls[0][1]).toEqual(['bp1', 3, 'rules-v1', 5000, repo.recommendationHash(rec(), 5000)]);
     expect(query).toHaveBeenCalledTimes(1); // no INSERT
   });
 
@@ -65,7 +67,7 @@ describe('saveRecommendation — persist with timestamp + input version', () => 
     query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([{}]);
     const r = await repo.saveRecommendation({ blueprintId: 'bp1', blueprintVersion: 3, recommendation: next });
     expect(r.stored).toBe(true);        // content changed → distinct run
-    expect(query.mock.calls[0][1][2]).toBe(repo.recommendationHash(next)); // looked up by NEW hash
+    expect(query.mock.calls[0][1][4]).toBe(repo.recommendationHash(next)); // looked up by NEW hash
     expect(query).toHaveBeenCalledTimes(2); // lookup + insert
   });
 
@@ -73,7 +75,8 @@ describe('saveRecommendation — persist with timestamp + input version', () => 
     query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([{}]);
     const r = await repo.saveRecommendation({ blueprintId: 'bp1', blueprintVersion: 3, recommendation: rec(), monthlyRuns: 10000 });
     expect(r.stored).toBe(true);        // different input → distinct run
-    expect(query.mock.calls[0][1][2]).toBe(repo.recommendationHash(rec(), 10000));
+    expect(query.mock.calls[0][1][3]).toBe(10000);                             // monthly_runs in the key
+    expect(query.mock.calls[0][1][4]).toBe(repo.recommendationHash(rec(), 10000));
     expect(query).toHaveBeenCalledTimes(2);
   });
 
