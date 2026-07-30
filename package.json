@@ -9,6 +9,7 @@
     "migrate": "node scripts/migrate.js",
     "migrate:verify": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/migrate.js && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-schema.js",
     "verify:schema": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-schema.js",
+    "verify:restore": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-restore.js",
     "check:config": "node scripts/check-prod-config.js",
     "test:email": "node scripts/test-email.js",
     "smoke:n8n": "node scripts/n8n-smoke.js",
