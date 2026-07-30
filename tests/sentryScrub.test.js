@@ -70,12 +70,31 @@ describe('baseSentryOptions — safe production defaults', () => {
     expect(scrubbed.user).toEqual({ id: 'u1', ip_address: null });
   });
 
-  it('does not enable in dev unless SENTRY_ENABLE_DEV=1', () => {
-    const prev = process.env.SENTRY_ENABLE_DEV;
-    delete process.env.SENTRY_ENABLE_DEV;
+  it('has NO hardcoded DSN fallback — dsn is undefined when the env is unset', () => {
+    const pub = process.env.NEXT_PUBLIC_SENTRY_DSN, srv = process.env.SENTRY_DSN;
+    delete process.env.NEXT_PUBLIC_SENTRY_DSN; delete process.env.SENTRY_DSN;
+    const o = baseSentryOptions();
+    expect(o.dsn).toBeUndefined();
+    expect(o.enabled).toBe(false); // no DSN → monitoring off, regardless of env
+    if (pub !== undefined) process.env.NEXT_PUBLIC_SENTRY_DSN = pub;
+    if (srv !== undefined) process.env.SENTRY_DSN = srv;
+  });
+
+  it('enables only with a DSN AND (prod or SENTRY_ENABLE_DEV=1)', () => {
+    const pub = process.env.NEXT_PUBLIC_SENTRY_DSN, dev = process.env.SENTRY_ENABLE_DEV;
+    delete process.env.NEXT_PUBLIC_SENTRY_DSN; delete process.env.SENTRY_DSN; delete process.env.SENTRY_ENABLE_DEV;
+
+    // DSN present but dev without opt-in → still off.
+    process.env.NEXT_PUBLIC_SENTRY_DSN = 'https://examplekey@o0.ingest.sentry.io/0';
     expect(baseSentryOptions().enabled).toBe(false); // NODE_ENV=test → not prod
+    // DSN present + dev opt-in → on.
     process.env.SENTRY_ENABLE_DEV = '1';
     expect(baseSentryOptions().enabled).toBe(true);
-    if (prev === undefined) delete process.env.SENTRY_ENABLE_DEV; else process.env.SENTRY_ENABLE_DEV = prev;
+    // No DSN even with opt-in → off (DSN is required).
+    delete process.env.NEXT_PUBLIC_SENTRY_DSN;
+    expect(baseSentryOptions().enabled).toBe(false);
+
+    if (pub !== undefined) process.env.NEXT_PUBLIC_SENTRY_DSN = pub;
+    if (dev === undefined) delete process.env.SENTRY_ENABLE_DEV; else process.env.SENTRY_ENABLE_DEV = dev;
   });
 });

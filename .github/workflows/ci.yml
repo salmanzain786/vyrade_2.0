@@ -46,3 +46,14 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # Tie each build to its commit so an error traces to the exact release.
+          SENTRY_RELEASE: ${{ github.sha }}
+          # Build-ONLY secret — uploads source maps for readable stack traces.
+          # Add it under Settings → Secrets and variables → Actions → Secrets.
+          # Absent on fork PRs → the build still succeeds and simply skips upload.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # Point the client bundle at your project DSN. DSN is public (safe to
+          # expose), so store it as a repo *variable*, not a secret. There is no
+          # hardcoded fallback — if unset, client monitoring stays off.
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
