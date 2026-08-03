@@ -10,11 +10,16 @@ CREATE TABLE IF NOT EXISTS users (
   email           VARCHAR(190) NOT NULL,
   password_hash   VARCHAR(255) NOT NULL,
   email_verified  TINYINT(1)   NOT NULL DEFAULT 0,
+  is_admin        TINYINT(1)   NOT NULL DEFAULT 0,   -- admin/ops dashboard access
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
                     ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_users_email (email)
 ) ENGINE=InnoDB;
+
+-- Add is_admin to an already-created users table (tolerant migration ignores
+-- ER_DUP_FIELDNAME when it already exists from the CREATE above).
+ALTER TABLE users ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0 AFTER email_verified;
 
 -- Short-lived one-time codes for email verification and password reset.
 -- The code itself is never stored — only a SHA-256 hash. Purpose scopes a code

@@ -13,6 +13,8 @@
     "check:config": "node scripts/check-prod-config.js",
     "test:email": "node scripts/test-email.js",
     "smoke:n8n": "node scripts/n8n-smoke.js",
+    "admin:set": "node scripts/set-admin.mjs",
+    "qa:admin": "node scripts/qa-admin.mjs",
     "seed:pricing": "node scripts/seed-pricing.mjs",
     "curate:workflows": "node scripts/curate-workflows.mjs",
     "seed:tools": "node scripts/seed-tools.mjs",
