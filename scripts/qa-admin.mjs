@@ -26,6 +26,20 @@ const NAME = 'QA — Broken Blueprint';
 const NODE = 'n8n-nodes-base.qaFailNode';
 const TOOL = 'QAFakeTool';
 
+// Low-cost baseline users seeded ALONGSIDE the $9.99 spike so the spike check is
+// self-contained on a CLEAN database. Without them the single spike row is the
+// whole average and can never be ≥ 2× itself. With N baselines at ~$0.05 the
+// window mean stays low, so $9.99 clears spikeFloor = max($0.50, 2×mean)
+// deterministically no matter what else is (or isn't) in the DB.
+const SPIKE_COST = 9.99;
+const BASELINE_COST = 0.05;
+const BASELINES = [1, 2, 3].map((i) => ({
+  user: `qa000000-2222-4222-8222-00000000000${i}`,
+  session: `qa000000-3333-4333-8333-00000000000${i}`,
+  msg: `qa000000-4444-4444-8444-00000000000${i}`,
+  email: `qa-baseline-${i}@vyrade.test`,
+}));
+
 const cfg = {
   host: process.env.DB_HOST || '127.0.0.1', port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME,
@@ -41,6 +55,11 @@ async function cleanup(c) {
   await c.query('DELETE FROM automation_blueprints WHERE id = ?', [ID.bp]);
   await c.query('DELETE FROM auth_attempts WHERE email = ?', [EMAIL]);
   await c.query('DELETE FROM users WHERE id = ?', [ID.user]);
+  for (const b of BASELINES) {
+    await c.query('DELETE FROM conversation_messages WHERE session_id = ?', [b.session]);
+    await c.query('DELETE FROM conversations WHERE session_id = ?', [b.session]);
+    await c.query('DELETE FROM users WHERE id = ?', [b.user]);
+  }
 }
 
 async function seed(c) {
@@ -60,11 +79,20 @@ async function seed(c) {
   // Blocked user (rate limit)
   await c.query('INSERT INTO auth_attempts (event, email, ip, user_id, outcome, reason) VALUES (?,?,?,?,?,?)',
     ['login', EMAIL, '203.0.113.99', ID.user, 'blocked', 'qa rate limit test']);
-  // Cost spike
+  // Cost spike — plus low-cost baseline users so the spike is a spike relative
+  // to a real average on a clean database (not just relative to itself).
   await c.query('INSERT INTO conversations (session_id, user_id, title, total_tokens, total_cost_usd) VALUES (?,?,?,?,?)',
-    [ID.session, ID.user, 'QA cost spike', 500000, 9.99]);
+    [ID.session, ID.user, 'QA cost spike', 500000, SPIKE_COST]);
   await c.query('INSERT INTO conversation_messages (id, session_id, role, content, model, prompt_tokens, completion_tokens, total_tokens, cost_usd) VALUES (?,?,?,?,?,?,?,?,?)',
-    [ID.msg, ID.session, 'assistant', 'qa', 'gpt-4o', 100000, 400000, 500000, 9.99]);
+    [ID.msg, ID.session, 'assistant', 'qa', 'gpt-4o', 100000, 400000, 500000, SPIKE_COST]);
+  for (const b of BASELINES) {
+    await c.query('INSERT INTO users (id, name, email, password_hash, email_verified, is_admin) VALUES (?,?,?,?,1,0)',
+      [b.user, 'QA Baseline', b.email, 'x']);
+    await c.query('INSERT INTO conversations (session_id, user_id, title, total_tokens, total_cost_usd) VALUES (?,?,?,?,?)',
+      [b.session, b.user, 'QA baseline', 1000, BASELINE_COST]);
+    await c.query('INSERT INTO conversation_messages (id, session_id, role, content, model, prompt_tokens, completion_tokens, total_tokens, cost_usd) VALUES (?,?,?,?,?,?,?,?,?)',
+      [b.msg, b.session, 'assistant', 'qa', 'gpt-4o', 500, 500, 1000, BASELINE_COST]);
+  }
   // Recommendation override
   await c.query('INSERT INTO export_runs (id, blueprint_id, blueprint_version, user_id, selected_platform, kind, recommended_platform, followed_recommendation, is_recommendation_override, override_reason) VALUES (?,?,1,?,?,?,?,0,1,?)',
     [ID.exp, ID.bp, ID.user, 'zapier', 'workflow', 'n8n', 'user_selected_platform']);
