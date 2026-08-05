@@ -14,6 +14,15 @@ decisions the client's review raised.
 | 1.5 AI-specific risk | ✅ Done | prompt-injection exposure, unsafe AI-tool/agent permissions |
 | 1.6 Structural/security | ✅ Done | missing error handling, **retry-not-configured**, browser-automation, personal-credential |
 
+**Reproducible real-workflow verification (client review #5):** a REAL
+Vyrade-generated 19-node workflow — redacted of secrets/emails/doc-ids (0 secrets
+remaining, asserted) — is committed at
+`tests/fixtures/scanner/vyrade-n8n-export.json` and scanned by
+`tests/scannerFixture.test.js`. So the "verified on real workflows" claim is now
+**checkable in CI**, not just a manual dev run. It surfaces
+`missing_error_handling`, `pii_detected`, `third_party_processor`,
+`no_retry_configured`, `sensitive_logging`, `no_retention_control` (risk High).
+
 Shared model + orchestrator: `model.js`, `scan.js`. API: `POST /api/scanner/scan` (auth-gated).
 Every finding has a stable `type` slug (e.g. `public_webhook_no_auth`,
 `prompt_injection_exposure`) for Phase 4 framework mapping; ambiguous checks are
@@ -58,6 +67,27 @@ detectors. All checks work across n8n + Make via the shared model.
 | 2.2 Special-category / health | ✅ | `special_category_data` (High, review) — health/biometric/genetic/mental-health/ethnicity/religion/orientation/criminal |
 | 2.3 Data minimisation | ✅ | `data_minimisation` (Low, **manual review**) — flags a node mapping >10 fields to an external service ("confirm all necessary"), not a false-confidence pass/fail |
 | 2.4 Retention / cross-border / processor | ✅ | `third_party_processor` (Low, review) — a PROCESSOR table matching BOTH n8n node-types and Make module ids to the same service, with region + international-transfer + retention/DPA notes |
+| 2.5 Consent-dependent actions | ✅ | `consent_dependent_action` (Medium, **manual review**) — flags a marketing-email / SMS-channel send (Mailchimp, SendGrid, Klaviyo, Twilio, …) with no visible upstream consent/opt-in gate; suppressed when a consent signal exists. Excludes transactional email (gmail/smtp) to avoid false positives. |
+
+| 2.6 Logging of sensitive information | ✅ | `sensitive_logging` — PII/special-category written to a **log/audit sink** (logging service, or a store whose target is named "log"/"audit", or a node named as a log). **Elevated severity**: PII→High, special-category→Critical (vs. Medium/High to a normal service), because logs persist and are broadly visible. Does not fire for non-log destinations. |
+
+| 2.7 Data retention | ✅ | `no_retention_control` (Low, **manual review**) — workflow **writes personal data to a persistent store** (DB/Sheets/S3/Airtable/…) with **no visible deletion/expiry/TTL/cleanup** step. Gated on PII (targeted, not noisy); suppressed when a delete/cleanup/TTL mechanism exists or the write has no personal data or is read-only. |
+
+**Manual-review-split decisions (client reviews):** retry, consent, and
+retention all follow the same rule — **Phase 2 owns the generic,
+structurally-inferable heuristic** (manual-review flag); **Phase 6 owns the
+policy-explicit version** declared on the Blueprint (retry limit N, "consent
+required before X", "retain N days" + deletion/access/DSAR). Nothing deferred
+silently, nothing a false-confidence auto-pass.
+
+**Deletion & access requirements (DSAR / data-subject rights) → PHASE 6
+(decided, documented).** Not implemented in Phase 2 and, unlike retention, has
+**no Phase 2 half**: whether the org can fulfil a GDPR/CCPA deletion/access
+request is a cross-system organizational capability, not inferable from one
+workflow's structure. Owned entirely by Phase 6's Blueprint policy comparison
+(same home as retry limits). Recorded as a code comment in `privacy.js`; the
+`third_party_processor` finding (2.4) already surfaces DSAR as a consideration
+in its remediation text.
 
 Verified on real Vyrade workflows: the email/spreadsheet workflows surface
 `pii_detected` + `third_party_processor` alongside the security findings.

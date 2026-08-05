@@ -1,0 +1,771 @@
+{
+  "name": "Vyrade-generated sample (redacted)",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -1200,
+        0
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "2",
+      "name": "📄 Google Sheets Source",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -900,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://redacted.example.com/path",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_GOOGLE_SHEETS_ID",
+          "cachedResultUrl": "https://redacted.example.com/path",
+          "cachedResultName": "Data"
+        }
+      },
+      "typeVersion": 4
+    },
+    {
+      "id": "3",
+      "name": "Read Suppression List",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -900,
+        180
+      ],
+      "parameters": {
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRange"
+            }
+          }
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://redacted.example.com/path",
+          "cachedResultName": "Suppression"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SUPPRESSION_SHEET_ID",
+          "cachedResultUrl": "https://redacted.example.com/path",
+          "cachedResultName": "Suppression"
+        }
+      },
+      "typeVersion": 4.7
+    },
+    {
+      "id": "4",
+      "name": "Prepare Records",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        -600,
+        40
+      ],
+      "parameters": {
+        "functionCode": "/*\nPrepareRecords:\n- Reads rows from the connected Google Sheets Source (items input)\n- Reads suppression list from node \"Read Suppression List\" (by reference)\n- Validates recipient_email presence and basic format\n- Applies suppression rules (opt_out column or presence in suppression list)\n- Honors consent_status == 'opted_in' when present\n- Outputs one item per original row with a 'status' field: 'valid'|'invalid'|'suppressed', plus reason\n*/\n\nconst rows = items.map(i => i.json || {});\n\n// Read suppression list rows from upstream node by name\nlet suppressionRows = [];\ntry {\n  const nodeSupp = $node[\"Read Suppression List\"].all();\n  // nodeSupp is an array of items; flatten to jsons\n  suppressionRows = nodeSupp.map(i => i.json || {});\n} catch (e) {\n  suppressionRows = [];\n}\n\nconst suppressionSet = new Set();\nfor (const r of suppressionRows) {\n  const e = (r.email || r.recipient_email || r.email_address || r.Email || r.EmailAddress);\n  if (e) suppressionSet.add(String(e).toLowerCase().trim());\n}\n\nconst emailRegex = /^\\S+@\\S+\\.\\S+$/;\n\nconst out = [];\nfor (let idx = 0; idx < rows.length; idx++) {\n  const r = rows[idx];\n  const email = (r.recipient_email || r.email || r.email_address || r.Email || '').toString().trim();\n  const optOutRaw = (r.opt_out || r.optOut || r.optout || r.opted_out);\n  const optOut = (typeof optOutRaw === 'string') ? optOutRaw.toLowerCase().trim() === 'true' : Boolean(optOutRaw);\n  const consent = (r.consent_status || r.consent || '').toString().trim();\n\n  // Basic presence check\n  if (!email) {\n    out.push({ json: Object.assign({}, r, { status: 'invalid', reason: 'missing_recipient_email', row_number: idx + 1 }) });\n    continue;\n  }\n\n  // Basic format check\n  if (!emailRegex.test(email)) {\n    out.push({ json: Object.assign({}, r, { status: 'invalid', reason: 'invalid_email_format', recipient_email: email, row_number: idx + 1 }) });\n    continue;\n  }\n\n  // Suppression list check\n  if (suppressionSet.has(email.toLowerCase())) {\n    out.push({ json: Object.assign({}, r, { status: 'suppressed', reason: 'in_suppression_list', recipient_email: email, row_number: idx + 1 }) });\n    continue;\n  }\n\n  // Opt-out flag check\n  if (optOut) {\n    out.push({ json: Object.assign({}, r, { status: 'suppressed', reason: 'opt_out_flag_set', recipient_email: email, row_number: idx + 1 }) });\n    continue;\n  }\n\n  // Consent check when present: require 'opted_in'\n  if (consent && consent.length > 0 && consent.toLowerCase() !== 'opted_in') {\n    out.push({ json: Object.assign({}, r, { status: 'suppressed', reason: 'consent_not_opted_in', recipient_email: email, row_number: idx + 1 }) });\n    continue;\n  }\n\n  // Passed all checks: mark valid\n  out.push({ json: Object.assign({}, r, { status: 'valid', recipient_email: email, row_number: idx + 1 }) });\n}\n\nreturn out;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5",
+      "name": "Status Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -300,
+        40
+      ],
+      "parameters": {
+        "rules": [
+          {
+            "value1": "={{ $json[\"status\"] }}",
+            "value2": "valid",
+            "operation": "equal"
+          },
+          {
+            "value1": "={{ $json[\"status\"] }}",
+            "value2": "invalid",
+            "operation": "equal"
+          },
+          {
+            "value1": "={{ $json[\"status\"] }}",
+            "value2": "suppressed",
+            "operation": "equal"
+          }
+        ],
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6",
+      "name": "Log Invalid",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        0,
+        -160
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Date": "={{ $now }}",
+            "Type": "=invalid_email",
+            "Message": "={{ `Row ${$json.row_number}: ${$json.recipient_email || ''} - ${$json.reason || 'invalid'}` }}"
+          },
+          "schema": [
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Type",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Message",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Invalid Emails"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ 'YOUR_STATUS_OR_LOG_SPREADSHEET_URL' }}"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "7",
+      "name": "Log Suppressed",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        0,
+        160
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Date": "={{ $now }}",
+            "Type": "=suppressed",
+            "Message": "={{ `Row ${$json.row_number}: ${$json.recipient_email || ''} - ${$json.reason || 'suppressed'}` }}"
+          },
+          "schema": [
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Type",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Message",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Suppressed"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ 'YOUR_STATUS_OR_LOG_SPREADSHEET_URL' }}"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "8",
+      "name": "Group Valid into Batches",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "functionCode": "/*\nGroupValidIntoBatches:\n- Receives only items with status === 'valid'\n- Groups them into chunks (batchSize) and returns one item per chunk where json.recipients = [ ...records ]\n*/\n\nconst batchSize = 20; // controlled batch size for sending\n\nconst valid = items.map(i => i.json).filter(r => r && r.status === 'valid');\nconst out = [];\nfor (let i = 0; i < valid.length; i += batchSize) {\n  const chunk = valid.slice(i, i + batchSize);\n  out.push({ json: { recipients: chunk } });\n}\nreturn out;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9",
+      "name": "Send Batch to Brevo",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        420,
+        0
+      ],
+      "parameters": {
+        "url": "https://redacted.example.com/path",
+        "options": {
+          "bodyContentType": "json"
+        },
+        "requestMethod": "POST",
+        "authentication": "none",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\n  \"sender\": { \"name\": \"PartnerHacks Outreach\", \"email\": \"redacted@example.com\" },\n  \"to\": $json.recipients.map(r => ({ \"email\": r.recipient_email, \"name\": (r.first_name ? `${r.first_name} ${r.last_name || ''}` : undefined) })),\n  \"subject\": \"={{ $json.recipients[0].email_subject || `Partnership offering from PartnerHacks` }}\",\n  \"htmlContent\": \"={{ $json.recipients.map(r => `Hi ${r.first_name || ''},<br><br>${r.email_body || 'Hello, we have a partnership opportunity.'}`).join('<hr/>') }}\",\n  \"headers\": { \"X-Mailer\": \"n8n-bulk-sender\" }\n}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "10",
+      "name": "Check Send Response",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.statusCode }}",
+              "value2": 200,
+              "value3": 299,
+              "operation": "isBetween"
+            }
+          ],
+          "string": [],
+          "boolean": []
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "11",
+      "name": "Process Brevo Response",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        980,
+        0
+      ],
+      "parameters": {
+        "functionCode": "/*\nProcessBrevoResponse:\n- The Send Batch to Brevo node returned a success response for the batch.\n- This node will map each recipient in the original request to an individual result item for logging/tracking.\n- The Brevo response shape can vary; put conservative placeholders when missing.\n*/\n\nconst recipients = $json.recipients || [];\nconst response = $json || {};\n\nconst results = [];\n\n// If Brevo returns a messageId or data per recipient, attempt to use it; otherwise mark as 'sent'\nconst messageId = response.messageId || response['message-id'] || response.id || null;\n\nfor (let i = 0; i < recipients.length; i++) {\n  const r = recipients[i];\n  results.push({ json: {\n    recipient_email: r.recipient_email,\n    first_name: r.first_name || '',\n    last_name: r.last_name || '',\n    status: 'sent',\n    messageId: messageId || null,\n    timestamp: new Date().toISOString()\n  }});\n}\n\nreturn results;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "12",
+      "name": "Log Send Result",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1260,
+        0
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Date": "={{ $now }}",
+            "Info": "={{ `first:${$json.first_name || ''} last:${$json.last_name || ''}` }}",
+            "Type": "={{ $json.status }}",
+            "Email": "={{ $json.recipient_email }}",
+            "MessageId": "={{ $json.messageId }}",
+            "Timestamp": "={{ $json.timestamp }}"
+          },
+          "schema": [
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Type",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Email",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "MessageId",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "MessageId",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Info",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Info",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Timestamp",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Send Log"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ 'YOUR_STATUS_OR_LOG_SPREADSHEET_URL' }}"
+        }
+      },
+      "typeVersion": 4.6
+    },
+    {
+      "id": "13",
+      "name": "Throttle Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "time": 1,
+        "unit": "seconds"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "14",
+      "name": "Read Status Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1860,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Send Log"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ 'YOUR_STATUS_OR_LOG_SPREADSHEET_URL' }}"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "15",
+      "name": "Create Summary",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "functionCode": "/*\nCreate a simple summary of counts: sent, failed, invalid, suppressed, total\nInput: rows from Read Status Sheet (items)\n*/\n\nconst rows = items.map(i => i.json || {});\nlet sent = 0; let failed = 0; let invalid = 0; let suppressed = 0;\nfor (const r of rows) {\n  const t = (r.Type || '').toString().toLowerCase();\n  if (t === 'sent' || t === 'success' || t === 'info') sent++;\n  else if (t === 'failed' || t === 'error') failed++;\n  else if (t === 'invalid_email' || t === 'invalid') invalid++;\n  else if (t === 'suppressed') suppressed++;\n}\nconst total = rows.length;\nconst summary = `Send summary:\\n- Total rows processed: ${total}\\n- Sent: ${sent}\\n- Failed: ${failed}\\n- Invalid: ${invalid}\\n- Suppressed: ${suppressed}`;\n\nreturn [{ json: { Email_Subject: 'Campaign Send Summary', Report_Summary: summary, summary_counts: { total, sent, failed, invalid, suppressed } } }];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "16",
+      "name": "Send Summary Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        2460,
+        0
+      ],
+      "parameters": {
+        "text": "={{ $('Create Summary').item.json.Report_Summary }}",
+        "options": {},
+        "subject": "={{ $('Create Summary').item.json.Email_Subject }}",
+        "toEmail": "={{ $json.notification_recipient || 'redacted@example.com' }}",
+        "fromEmail": "redacted@example.com",
+        "emailFormat": "text"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "G1kyF8cSWTZ4vouN",
+          "name": "SMTP -test"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "17",
+      "name": "Pause Campaign",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        980,
+        -260
+      ],
+      "parameters": {
+        "functionCode": "/*\nPauseCampaign:\n- Called when Brevo or Google Sheets is unavailable or a batch send fails critically\n- Prepare a small payload to update campaign status in config sheet\n*/\n\nreturn [{ json: { campaign_status: 'paused', reason: 'send_failure_detected', timestamp: new Date().toISOString() } }];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "18",
+      "name": "Update Campaign Status (sheet)",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1250,
+        -260
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Date": "={{ $now }}",
+            "Type": "campaign_paused",
+            "Message": "={{ `Campaign paused due to send failure: ${$json.reason || ''} at ${$json.timestamp || ''}` }}"
+          },
+          "schema": [
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Type",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Message",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Campaign Status"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ 'YOUR_STATUS_OR_LOG_SPREADSHEET_URL' }}"
+        }
+      },
+      "typeVersion": 4.6
+    },
+    {
+      "id": "19",
+      "name": "Notify Stakeholders",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1560,
+        -260
+      ],
+      "parameters": {
+        "sendTo": "redacted@example.com",
+        "message": "={{ `Campaign paused due to repeated send failures. Please review logs: ${$('Update Campaign Status (sheet)').json.Message || 'see status sheet'}` }}",
+        "options": {},
+        "subject": "=Campaign Paused - Action Required",
+        "emailType": "text"
+      },
+      "typeVersion": 2.1
+    }
+  ],
+  "connections": {
+    "Status Switch": {
+      "main": [
+        [
+          {
+            "node": "Group Valid into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Suppressed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Throttle Wait": {
+      "main": [
+        [
+          {
+            "node": "Read Status Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Summary": {
+      "main": [
+        [
+          {
+            "node": "Send Summary Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "📄 Google Sheets Source",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Suppression List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause Campaign": {
+      "main": [
+        [
+          {
+            "node": "Update Campaign Status (sheet)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Send Result": {
+      "main": [
+        [
+          {
+            "node": "Throttle Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Records": {
+      "main": [
+        [
+          {
+            "node": "Status Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Status Sheet": {
+      "main": [
+        [
+          {
+            "node": "Create Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Send Response": {
+      "main": [
+        [
+          {
+            "node": "Process Brevo Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pause Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Batch to Brevo": {
+      "main": [
+        [
+          {
+            "node": "Check Send Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Suppression List": {
+      "main": [
+        [
+          {
+            "node": "Prepare Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Brevo Response": {
+      "main": [
+        [
+          {
+            "node": "Log Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Valid into Batches": {
+      "main": [
+        [
+          {
+            "node": "Send Batch to Brevo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📄 Google Sheets Source": {
+      "main": [
+        [
+          {
+            "node": "Prepare Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Campaign Status (sheet)": {
+      "main": [
+        [
+          {
+            "node": "Notify Stakeholders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
