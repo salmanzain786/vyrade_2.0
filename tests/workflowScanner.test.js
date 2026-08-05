@@ -69,8 +69,65 @@ describe('scanWorkflow — n8n (Phase 1)', () => {
     expect(f.manual_review).toBe(true);
   });
 
-  it('rejects an unsupported platform, and surfaces Make as milestone 1.2', () => {
-    expect(() => scanWorkflow({ workflow: clean, platform: 'make' })).toThrow(/Make is milestone 1\.2/);
+  it('flags weak webhook auth (basic) as review, not a hard fail', () => {
+    const wf = { name: 'x', nodes: [{ id: '1', name: 'Hook', type: 'n8n-nodes-base.webhook', parameters: { authentication: 'basicAuth' } }], connections: {} };
+    const f = scanWorkflow({ workflow: wf }).findings.find((x) => x.type === 'weak_webhook_auth');
+    expect(f).toBeTruthy();
+    expect(f.severity).toBe('medium');
+    expect(f.manual_review).toBe(true);
+  });
+
+  it('does NOT flag strong (header/JWT) webhook auth', () => {
+    const wf = { name: 'x', nodes: [{ id: '1', name: 'Hook', type: 'n8n-nodes-base.webhook', parameters: { authentication: 'headerAuth' } }], connections: {} };
+    const types = scanWorkflow({ workflow: wf }).findings.map((f) => f.type);
+    expect(types).not.toContain('weak_webhook_auth');
+    expect(types).not.toContain('public_webhook_no_auth');
+  });
+
+  it('flags excessive OAuth scopes for review', () => {
+    const wf = { name: 'x', nodes: [{ id: '1', name: 'G', type: 'n8n-nodes-base.googleSheets',
+      parameters: { scope: ['a', 'b', 'c', 'd', 'e', 'f'] } }], connections: {} };
+    expect(scanWorkflow({ workflow: wf }).findings.map((f) => f.type)).toContain('excessive_permissions');
+  });
+
+  it('flags external calls with no retry configured (distinct check)', () => {
+    const types = scanWorkflow({ workflow: vulnerable }).findings.map((f) => f.type);
+    expect(types).toContain('no_retry_configured');
+  });
+
+  it('rejects a genuinely unsupported platform (zapier)', () => {
+    expect(() => scanWorkflow({ workflow: clean, platform: 'zapier' })).toThrow(/out of scope/i);
+  });
+});
+
+describe('scanWorkflow — Make.com (milestone 1.2, upload-only)', () => {
+  const makeScenario = {
+    name: 'Make lead intake',
+    flow: [
+      { id: 1, module: 'gateway:CustomWebHook', parameters: {}, mapper: {}, metadata: { designer: { name: 'Webhook' } } },
+      { id: 2, module: 'http:ActionSendData', parameters: {}, metadata: { designer: { name: 'HTTP call' } },
+        mapper: { url: 'http://api.example.com/x', apiKey: 'sk-ant-ABCDEFGHIJ1234567890' } },
+      { id: 3, module: 'openai-gpt-3:CreateCompletion', parameters: {}, metadata: { designer: { name: 'OpenAI' } },
+        mapper: { prompt: 'Summarize {{1.body}}' } },
+      { id: 4, module: 'builtin:BasicRouter', routes: [{ flow: [{ id: 5, module: 'slack:CreateMessage', mapper: { text: '{{3.result}}' } }] }] },
+    ],
+  };
+
+  it('parses the flow (incl. router routes) and applies the shared detectors', () => {
+    const r = scanWorkflow({ workflow: makeScenario, platform: 'make' });
+    expect(r.platform).toBe('make');
+    expect(r.node_count).toBe(5);                 // 4 top-level + 1 in the router route
+    const types = new Set(r.findings.map((f) => f.type));
+    expect(types).toContain('public_webhook_no_auth');    // Make webhook is public by default
+    expect(types).toContain('hardcoded_credential');      // secret in the mapper
+    expect(types).toContain('insecure_http');             // http:// in the mapper
+    expect(types).toContain('prompt_injection_exposure'); // external input → AI prompt
+    expect(types).toContain('missing_error_handling');    // no onerror handlers
+    expect(r.summary.risk_level).toBe('High');
+  });
+
+  it('rejects non-Make JSON on the make platform', () => {
+    expect(() => scanWorkflow({ workflow: { nodes: [] }, platform: 'make' })).toThrow(/Make scenario/);
   });
 });
 
