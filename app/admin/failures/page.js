@@ -38,10 +38,7 @@ export default async function FailuresAdminPage({ searchParams }) {
   return (
     <main className="mx-auto max-w-6xl p-8">
       <div className="mb-4 flex items-center justify-between">
-        <div>
-          <a href="/admin" className="text-xs text-muted-foreground hover:underline">← Admin</a>
-          <h1 className="text-2xl font-semibold">Failures &amp; import checks</h1>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Failures &amp; import checks</h1>
         <form method="get" className="flex items-end gap-2">
           <label className="text-xs text-muted-foreground">Range
             <select name="days" defaultValue={String(days)} className="ml-2 rounded-md border bg-background px-2 py-1 text-sm">

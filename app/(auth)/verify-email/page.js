@@ -3,11 +3,13 @@
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import AuthShell, { Field, AuthInput, AuthButton, AuthLink } from '@/components/auth/AuthShell';
+import { safeNext } from '@/lib/utils';
 import { track } from '@/lib/analytics/mixpanel';
 import { EVENTS } from '@/lib/analytics/events';
 
 function VerifyEmailInner() {
   const params = useSearchParams();
+  const next = safeNext(params.get('next'), '');
   const [email, setEmail] = useState(params.get('email') || '');
   const [code, setCode] = useState('');
   const [error, setError] = useState(null);
@@ -26,7 +28,7 @@ function VerifyEmailInner() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Verification failed');
-      window.location.assign('/');
+      window.location.assign(next || '/');
     } catch (err) {
       setError(err.message); setBusy(false);
     }

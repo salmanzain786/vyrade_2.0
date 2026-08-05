@@ -45,10 +45,7 @@ export default async function BlueprintsAdminPage({ searchParams }) {
   return (
     <main className="mx-auto max-w-6xl p-8">
       <div className="mb-4 flex items-center justify-between">
-        <div>
-          <a href="/admin" className="text-xs text-muted-foreground hover:underline">← Admin</a>
-          <h1 className="text-2xl font-semibold">Blueprints</h1>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Blueprints</h1>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{data.total} total</span>
           <a href={`/api/admin/blueprints/export${qs({ search, status })}`}

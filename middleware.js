@@ -13,6 +13,9 @@ const PUBLIC_PAGES = [
   '/login', '/register', '/verify-email', '/forgot-password', '/reset-password',
   // Public Workflow Encyclopedia (SEO / technology-page strategy).
   '/technology', '/workflows',
+  // Purchase pages self-gate: signed-out visitors are sent to REGISTRATION with
+  // a return path (not the middleware's default /login bounce).
+  '/purchase',
 ];
 
 function looksLikeLiveSession(token) {

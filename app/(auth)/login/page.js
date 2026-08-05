@@ -1,14 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import AuthShell, { Field, AuthInput, AuthButton, AuthLink } from '@/components/auth/AuthShell';
+import { safeNext } from '@/lib/utils';
 import { track } from '@/lib/analytics/mixpanel';
 import { EVENTS } from '@/lib/analytics/events';
 
 export default function LoginPage() {
   const router = useRouter();
+  const next = safeNext(useSearchParams().get('next'), '');
+  const withNext = (base) => (next ? `${base}${base.includes('?') ? '&' : '?'}next=${encodeURIComponent(next)}` : base);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,10 +31,10 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        if (data.needsVerification) { router.push(`/verify-email?email=${encodeURIComponent(email)}`); return; }
+        if (data.needsVerification) { router.push(withNext(`/verify-email?email=${encodeURIComponent(email)}`)); return; }
         throw new Error(data.error || 'Login failed');
       }
-      window.location.assign('/');
+      window.location.assign(next || '/');
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -43,7 +46,7 @@ export default function LoginPage() {
       title="Sign In"
       subtitle="Welcome back — pick up where your blueprints left off."
       error={error}
-      footer={<>Don’t have an account? <AuthLink href="/register">Sign Up</AuthLink></>}
+      footer={<>Don’t have an account? <AuthLink href={withNext('/register')}>Sign Up</AuthLink></>}
     >
       <form onSubmit={onSubmit} className="space-y-3">
         <Field htmlFor="email">

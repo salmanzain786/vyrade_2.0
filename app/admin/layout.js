@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth/session';
+import AdminSidebar from '@/components/admin/AdminSidebar';
 
 // Admin dashboard gate (milestone 3.2). Server-side and authoritative: the edge
 // middleware only guarantees a signed-in user reaches here; THIS decides admin.
@@ -11,5 +12,11 @@ export default async function AdminLayout({ children }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
   if (!user.isAdmin) notFound();
-  return <section className="min-h-screen bg-background">{children}</section>;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <AdminSidebar user={user} />
+      <div className="md:ml-60">{children}</div>
+    </div>
+  );
 }

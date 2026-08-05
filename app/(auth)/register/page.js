@@ -1,14 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import AuthShell, { Field, AuthInput, AuthButton, AuthLink } from '@/components/auth/AuthShell';
+import { safeNext } from '@/lib/utils';
 import { track } from '@/lib/analytics/mixpanel';
 import { EVENTS } from '@/lib/analytics/events';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const next = safeNext(useSearchParams().get('next'), '');
+  const withNext = (base) => (next ? `${base}${base.includes('?') ? '&' : '?'}next=${encodeURIComponent(next)}` : base);
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
@@ -29,7 +32,7 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Registration failed');
-      router.push(`/verify-email?email=${encodeURIComponent(form.email)}`);
+      router.push(withNext(`/verify-email?email=${encodeURIComponent(form.email)}`));
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -41,7 +44,7 @@ export default function RegisterPage() {
       title="Create your account"
       subtitle="Start drafting automation blueprints in minutes."
       error={error}
-      footer={<>Already have an account? <AuthLink href="/login">Sign In</AuthLink></>}
+      footer={<>Already have an account? <AuthLink href={withNext('/login')}>Sign In</AuthLink></>}
     >
       <form onSubmit={onSubmit} className="space-y-3">
         <Field htmlFor="name">
