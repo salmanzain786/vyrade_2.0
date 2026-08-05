@@ -47,6 +47,21 @@ This split means retry is no longer silently dropped between phases: the generic
 "is retry configured at all" lives in Phase 1; the "does it match the approved
 limit" lives in Phase 6.
 
+## Phase 2 — Privacy analysis (✅ done, both platforms)
+
+`lib/services/scanner/privacy.js`, run by the orchestrator after the security
+detectors. All checks work across n8n + Make via the shared model.
+
+| Milestone | Status | Finding type |
+|---|---|---|
+| 2.1 PII field detection | ✅ | `pii_detected` (Medium) — email/phone/national-id/address/DOB/name/card/IP, matched on field NAMES + mappings (snake/camel-case normalised) |
+| 2.2 Special-category / health | ✅ | `special_category_data` (High, review) — health/biometric/genetic/mental-health/ethnicity/religion/orientation/criminal |
+| 2.3 Data minimisation | ✅ | `data_minimisation` (Low, **manual review**) — flags a node mapping >10 fields to an external service ("confirm all necessary"), not a false-confidence pass/fail |
+| 2.4 Retention / cross-border / processor | ✅ | `third_party_processor` (Low, review) — a PROCESSOR table matching BOTH n8n node-types and Make module ids to the same service, with region + international-transfer + retention/DPA notes |
+
+Verified on real Vyrade workflows: the email/spreadsheet workflows surface
+`pii_detected` + `third_party_processor` alongside the security findings.
+
 ## Still open (unchanged product decisions, not code)
 - Phase 6 (Blueprint-aware comparison) in v1, or ship Phases 1–5 standalone first?
 - Who owns the Governance & Policy Requirements taxonomy (6.1)?
