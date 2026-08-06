@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const query = vi.fn();
 vi.mock('../lib/config/db.js', () => ({ pool: { query: (...a) => query(...a) } }));
-const { setResolution, getResolutions, getLastTwoScans } = await import('../lib/services/scanner/scanRepository.js');
+const { setResolution, getResolutions, getLastTwoScans, markFindingsResolved } = await import('../lib/services/scanner/scanRepository.js');
 
 describe('resolution tracking (7.2)', () => {
   beforeEach(() => query.mockReset());
@@ -33,6 +33,27 @@ describe('resolution tracking (7.2)', () => {
     ]]);
     const map = await getResolutions('bp1');
     expect(map['insecure_http::A'].status).toBe('resolved');
+  });
+
+  it('markFindingsResolved upserts every diff-resolved finding as "resolved" (7.2↔7.3 link)', async () => {
+    query.mockResolvedValue([{}]);
+    const n = await markFindingsResolved({
+      blueprintId: 'bp1', userId: 'u1', note: 'Auto-resolved by regeneration (scan #42)',
+      findings: [{ type: 'missing_error_handling', node: null }, { type: 'insecure_http', node: 'A' }],
+    });
+    expect(n).toBe(2);
+    expect(query).toHaveBeenCalledTimes(2);
+    const allParams = query.mock.calls.flatMap((c) => c[1]);
+    expect(allParams).toContain('resolved');
+    expect(allParams).toContain('missing_error_handling::');
+    expect(allParams).toContain('insecure_http::A');
+    expect(allParams).toContain('Auto-resolved by regeneration (scan #42)');
+  });
+
+  it('markFindingsResolved is best-effort — one failure does not abort the batch', async () => {
+    query.mockRejectedValueOnce(new Error('db')).mockResolvedValueOnce([{}]);
+    const n = await markFindingsResolved({ blueprintId: 'bp1', findings: [{ type: 'a', node: null }, { type: 'b', node: null }] });
+    expect(n).toBe(1); // the second succeeded
   });
 
   it('getLastTwoScans parses findings for the before/after diff', async () => {

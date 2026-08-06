@@ -39,7 +39,7 @@ export default function RemediateButton({ blueprintId }) {
       {error && <span className="max-w-xs text-right text-[11px] text-red-600 dark:text-red-400">{error}</span>}
       {result && (
         <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
-          {result.diff?.counts?.resolved ?? 0} resolved · readiness {result.before?.readiness_pct}% → {result.after?.readiness_pct}%
+          {result.diff?.counts?.resolved ?? 0} resolved{result.auto_resolved ? ' (auto-marked)' : ''} · readiness {result.before?.readiness_pct}% → {result.after?.readiness_pct}%
         </span>
       )}
     </div>

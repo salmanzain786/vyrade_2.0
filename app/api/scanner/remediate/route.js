@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/guard';
 import { assertBlueprintOwner } from '@/lib/auth/ownership';
-import { getScanContextForBlueprint, getLatestScan, saveScan } from '@/lib/services/scanner/scanRepository';
+import { getScanContextForBlueprint, getLatestScan, saveScan, markFindingsResolved } from '@/lib/services/scanner/scanRepository';
 import { scanContext } from '@/lib/services/scanner/scan';
 import { buildRemediationBrief, remediationPromptBlock } from '@/lib/services/scanner/remediation';
 import { diffScans } from '@/lib/services/scanner/reassessment';
@@ -56,6 +56,17 @@ export const POST = withAuth(async (user, request) => {
   };
 
   const diff = diffScans({ current: after, previous: before });
+
+  // 7.2 ↔ 7.3 — auto-close the findings the diff proved gone, tied to this
+  // regenerated scan, so status badges match the "N resolved" result. Best-effort.
+  let auto_resolved = 0;
+  try {
+    auto_resolved = await markFindingsResolved({
+      blueprintId, findings: diff.resolved, userId: user.id,
+      note: `Auto-resolved by regeneration (scan #${scanId ?? '—'})`,
+    });
+  } catch { /* status sync is best-effort — never fail the remediation on it */ }
+
   return NextResponse.json({
     ok: true,
     scan_id: scanId,
@@ -63,5 +74,6 @@ export const POST = withAuth(async (user, request) => {
     before: { readiness_pct: before.readiness_pct, security_risk_level: before.security_risk_level },
     after: { readiness_pct: after.readiness_pct, security_risk_level: after.security_risk_level },
     diff: { counts: diff.counts, readiness_delta: diff.readiness_delta, improved: diff.improved },
+    auto_resolved,
   });
 });
