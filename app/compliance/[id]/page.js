@@ -1,12 +1,13 @@
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldCheck, AlertTriangle, FileWarning, ClipboardList, Eye, History, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, FileWarning, ClipboardList, Eye, History, ArrowUp, ArrowDown, Minus, GitCompareArrows, CheckCircle2, XCircle } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth/session';
 import { assertBlueprintOwner } from '@/lib/auth/ownership';
 import { getScanContextForBlueprint, getLatestScan, getScanHistory, saveScan } from '@/lib/services/scanner/scanRepository';
 import { scanContext } from '@/lib/services/scanner/scan';
 import { VyradeMark } from '@/components/VyradeLogo';
 import RescanButton from '@/components/scanner/RescanButton';
+import PolicyEditor from '@/components/scanner/PolicyEditor';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +61,8 @@ export default async function CompliancePage({ params }) {
   const r = latest.report;
   const o = r.overall;
   const e = r.evidence_and_limitations;
+  const pc = r.policy_compliance || null;
+  const PC_TONE = { compliant: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400', violations: 'border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-400', no_policy: 'border-border bg-muted/30 text-muted-foreground', policy_disabled: 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400' };
 
   const FindingRow = ({ f }) => (
     <div className="flex items-start gap-3 border-b border-border py-2.5 last:border-0">
@@ -139,6 +142,41 @@ export default async function CompliancePage({ params }) {
             ))}
           </div>
         </Card>
+
+        {/* 6.4 Policy compliance — Blueprint-vs-workflow (the differentiator) */}
+        {pc && (
+          <Card title="Policy compliance — does this match what was approved?" icon={GitCompareArrows}>
+            <div className={`rounded-lg border p-3 text-sm ${PC_TONE[pc.status] || PC_TONE.no_policy}`}>{pc.summary}</div>
+
+            {pc.version_drift?.drifted && (
+              <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400">
+                <strong>Version drift.</strong> {pc.version_drift.detail}
+              </div>
+            )}
+
+            {pc.violations?.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {pc.violations.map((v, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">{v.title}</div>
+                      <div className="text-xs text-muted-foreground">{v.detail}</div>
+                    </div>
+                    <Badge severity={v.severity} />
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {pc.status === 'compliant' && (
+              <div className="mt-3 flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" />Workflow matches approved policy on the evaluated checks.</div>
+            )}
+          </Card>
+        )}
+
+        {/* 6.1 Policy editor — author the approved policy */}
+        <PolicyEditor blueprintId={params.id} />
 
         {/* 5.2 Priority findings */}
         {(r.priority_findings.critical.length + r.priority_findings.high.length) > 0 && (

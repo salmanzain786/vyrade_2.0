@@ -208,11 +208,57 @@ before/after" gap and lays the groundwork Phase 7 (Remediation Loop) needs:
 reassessment now has a real baseline to compare against. 6 persistence tests
 (`tests/scanPersistence.test.js`).
 
-## Deferred to Phase 6 (decided & tracked — not gaps, not silent)
+## Phase 6 — Blueprint-Aware Comparison — ✅ engineering slice done
 
-These need a NEW Blueprint field/schema (Phase 6), so they are deliberately NOT
-Phase 2/3 checks. Each is disclosed in code; consolidated here so it's tracked
-in one place, not only in comments.
+The differentiator: "does this workflow match what was **approved**?" Phases 1–3
+flag generic risk; Phase 6 diffs the workflow against a human-authored
+**governance policy**.
+
+**Grounded in verified data (not the spec's assumption).** The spec assumed the
+Blueprint captures no policy. Probed all 15 current blueprints: the policy-slot
+fields (`prohibited_platforms`, `required_platforms`, `self_hosting_required`,
+`security_requirements`, `compliance_requirements`, `approval_points`) are **0%
+populated** — so the premise holds, the slots are dead. The one real signal is
+`retry_requirements[].max_retries` (**40%**, e.g. `max_retries:2`), so the
+authoring form **seeds a default from it**.
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 6.1 Policy schema + storage | ✅ | `lib/services/scanner/policy.js` (normalise/derive/`policyHasConstraints`) + **separate `blueprint_policies` table** (not on the versioned Blueprint JSON — a regeneration must never clobber approved policy). Repo: `getPolicy`/`savePolicy`. **Opt-in**: disabled/empty policy → zero findings. |
+| 6.1 Capture UI | ✅ | `components/scanner/PolicyEditor.js` on `/compliance/[id]` — grouped toggles (forbid external AI, self-hosted-only, forbidden/required platforms, org-owned creds, error branch, retry limit, human approval + actions, incident alerting, log retention). `GET/PUT /api/scanner/policy`. **Note:** authoring lives on the compliance page, NOT wired into the chat creation flow — see decision below. |
+| 6.2 Diff engine | ✅ | `policyDetectors.js#comparePolicyToWorkflow` → `policy_external_model_used`, `policy_data_egress`, `policy_forbidden_platform`, `policy_missing_required_platform`, `policy_self_hosted_violation`, `policy_personal_credential`, `policy_error_branch_missing`, `policy_retry_limit_exceeded`, `policy_retry_not_configured`, `policy_approval_missing`, `policy_alerting_missing`, `policy_log_retention_undeclared`. Self-hosted models (ollama/localai/vllm) correctly NOT flagged as external. |
+| 6.3 Version drift | ✅ | `detectVersionDrift` — flags a workflow generated from an outdated Blueprint version (reuses `blueprint_workflows.blueprint_version` vs `current_version`). |
+| 6.4 Report integration | ✅ | `report.js` — new `policy_compliance` section (`status`: no_policy / policy_disabled / violations / compliant; violations list; version_drift). Rendered on the compliance page as its own "does this match what was approved?" card. Policy findings flow into readiness/priority/remediations (category `policy`). |
+
+**Verified on the real fixture** (strict policy: no external AI, org creds,
+error branch, retry ≤ 3, approval): correctly flagged `policy_error_branch_missing`
+(High) + `policy_retry_not_configured` (Low) + version drift v2→v4, and — the
+honest part — did **NOT** invent external-AI or personal-credential violations
+the fixture doesn't have (no false positives). Readiness 70% → 50% under policy.
+16 tests (`tests/policyDiff.test.js`).
+
+**Product decisions (made & documented — the spec flagged these as open):**
+1. **Storage** — separate `blueprint_policies` table, human-authored, decoupled
+   from the AI-generated versioned Blueprint. Policy = the stable contract; the
+   workflow = the implementation checked against it.
+2. **Opt-in** — no authored/enabled policy ⇒ no policy findings and an explicit
+   "no policy defined" state in the report (honest, not silent, not noisy).
+3. **Capture point** — authoring is a governance panel on the compliance page,
+   **not** forced into the chat Blueprint-creation flow. The spec's 6.1 suggests
+   creation-time capture; that's a larger, riskier change to a working funnel and
+   a genuine product call left to the client. Everything is in place to move the
+   editor into the creation flow later without touching the engine.
+
+**Not done (needs the client / non-engineering):** the deeper 6.1 "required at
+creation time" product decision + funnel UI; ownership of the policy taxonomy;
+legal review of framework mappings (unchanged from Phase 4).
+
+## Deferred to Phase 6 → now RESOLVED where structurally possible
+
+The items below were parked for Phase 6. With the policy engine built, the
+policy-declarable ones (retry limit, consent/approval-before-X, platform/hosting,
+org-owned creds, log-retention) are now **checkable via the authored policy**.
+The rest remain genuinely non-inferable (need org-level fields or human input).
 
 | Item | Why Phase 6 (not now) |
 |---|---|
@@ -223,6 +269,11 @@ in one place, not only in comments.
 | Policy-explicit directives — retry limit N, "consent required before X", "retain N days", recovery-runbook | The generic/structural half is already checked in Phase 1–3; the policy-specific limits are Blueprint-declared → Phase 6 diff engine. |
 
 ## Still open (product decisions, not code)
-- Phase 6 (Blueprint-aware comparison) in v1, or ship Phases 1–5 standalone first?
-- Who owns the Governance & Policy Requirements taxonomy (6.1)?
+- **Phase 6 capture point**: move the policy editor into the chat Blueprint-creation
+  flow (spec 6.1), or keep it as the compliance-page governance panel? (Engine is
+  ready either way.)
+- Who owns the Governance & Policy Requirements taxonomy (6.1)? (Default schema
+  shipped; taxonomy ownership still a client call.)
 - Legal/compliance review of the framework-mapping content (Phase 4)?
+- Next engineering phase: Phase 7 (Remediation Loop) — now unblocked, since scan
+  persistence (baseline/history) AND policy comparison both exist.
