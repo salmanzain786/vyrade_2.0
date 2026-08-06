@@ -1,13 +1,14 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, LayoutGrid, AlertTriangle, DollarSign, Activity, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, AlertTriangle, DollarSign, Activity, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VyradeMark } from '@/components/VyradeLogo';
 
 const NAV = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
   { href: '/admin/blueprints', label: 'Blueprints', icon: LayoutGrid },
+  { href: '/admin/governance', label: 'Risk & Governance', icon: ShieldCheck },
   { href: '/admin/failures', label: 'Failures', icon: AlertTriangle },
   { href: '/admin/cost', label: 'Cost & usage', icon: DollarSign },
   { href: '/admin/insights', label: 'Insights', icon: Activity },

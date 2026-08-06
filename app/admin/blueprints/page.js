@@ -27,6 +27,9 @@ function scoreClass(s) {
   if (s >= 50) return 'text-amber-600';
   return 'text-red-600';
 }
+function riskClass(r) {
+  return r === 'High' ? 'text-red-600' : r === 'Medium' ? 'text-amber-600' : r === 'Low' ? 'text-emerald-600' : 'text-muted-foreground';
+}
 function qs(params) {
   const s = new URLSearchParams(Object.entries(params).filter(([, v]) => v));
   const str = s.toString();
@@ -82,13 +85,14 @@ export default async function BlueprintsAdminPage({ searchParams }) {
               <th className={th}>User</th>
               <th className={th}>Status</th>
               <th className={th}>Readiness</th>
+              <th className={th}>Governance</th>
               <th className={th}>Ver</th>
               <th className={th}>Last activity</th>
             </tr>
           </thead>
           <tbody>
             {data.rows.length === 0 && (
-              <tr><td className={`${td} text-muted-foreground`} colSpan={6}>No blueprints match.</td></tr>
+              <tr><td className={`${td} text-muted-foreground`} colSpan={7}>No blueprints match.</td></tr>
             )}
             {data.rows.map((b) => (
               <tr key={b.id} className="border-b last:border-0 hover:bg-muted/30">
@@ -104,6 +108,11 @@ export default async function BlueprintsAdminPage({ searchParams }) {
                     {b.readiness_score == null ? '—' : `${b.readiness_score}%`}
                   </span>
                   {b.blocking_count > 0 && <span className="ml-2 text-xs text-muted-foreground">{b.blocking_count} blocking</span>}
+                </td>
+                <td className={td}>
+                  {b.gov_readiness == null
+                    ? <a href={`/compliance/${b.id}`} className="text-xs text-muted-foreground hover:underline">not scanned</a>
+                    : <a href={`/compliance/${b.id}`} className="hover:underline"><span className={`font-medium ${scoreClass(b.gov_readiness)}`}>{b.gov_readiness}%</span><span className={`ml-2 text-xs ${riskClass(b.gov_risk)}`}>{b.gov_risk || ''}</span></a>}
                 </td>
                 <td className={td}>v{b.version}</td>
                 <td className={`${td} text-muted-foreground`}>{fmtDate(b.updated_at)}</td>

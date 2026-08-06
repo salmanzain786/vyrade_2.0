@@ -1,8 +1,9 @@
-import { LayoutGrid, AlertTriangle, DollarSign, Activity, ArrowRight } from 'lucide-react';
+import { LayoutGrid, AlertTriangle, DollarSign, Activity, ShieldCheck, ArrowRight } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth/session';
 import { listBlueprints } from '@/lib/services/admin/adminBlueprintsRepository';
 import { failureSummary, importVerdicts } from '@/lib/services/admin/adminFailuresRepository';
 import { costSummary } from '@/lib/services/admin/adminCostRepository';
+import { governanceRollup } from '@/lib/services/admin/adminGovernanceRepository';
 import { formatMoney } from '@/lib/utils';
 
 // Admin overview (milestone 3.3 landing) — live at-a-glance stats + view cards.
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic';
 
 const VIEWS = [
   { href: '/admin/blueprints', title: 'Blueprints', desc: 'All blueprints: status, readiness, version, activity.', icon: LayoutGrid },
+  { href: '/admin/governance', title: 'Risk & Governance', desc: 'Org-wide readiness, risk, sensitive data, ownerless & outdated automations.', icon: ShieldCheck },
   { href: '/admin/failures', title: 'Failures & import checks', desc: 'Import failures, failing nodes, repairs.', icon: AlertTriangle },
   { href: '/admin/cost', title: 'Cost & usage', desc: 'Per-user token spend, trend, rate-limit blocks.', icon: DollarSign },
   { href: '/admin/insights', title: 'Operational insights', desc: 'Top failing nodes, doc gaps, outcomes.', icon: Activity },
@@ -26,12 +28,13 @@ function Stat({ label, value, sub }) {
 }
 
 export default async function AdminHome() {
-  const [user, bp, fail, verdicts, cost] = await Promise.all([
+  const [user, bp, fail, verdicts, cost, gov] = await Promise.all([
     getCurrentUser(),
     listBlueprints({ pageSize: 1 }).catch(() => ({ total: 0 })),
     failureSummary({ days: 30 }).catch(() => ({ import_failed: 0, generation_failed: 0 })),
     importVerdicts().catch(() => ({ failed: 0 })),
     costSummary({ days: 30 }).catch(() => ({ total_cost: 0, users: 0 })),
+    governanceRollup().catch(() => ({ scanned: 0, avg_readiness: null, risk: { High: 0 } })),
   ]);
 
   return (
@@ -46,8 +49,8 @@ export default async function AdminHome() {
       {/* Live stat tiles */}
       <section className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Blueprints" value={bp.total} sub="across all users" />
+        <Stat label="Gov. readiness" value={gov.avg_readiness == null ? '—' : `${gov.avg_readiness}%`} sub={`${gov.scanned} scanned · ${gov.risk?.High ?? 0} high-risk`} />
         <Stat label="Import failures" value={fail.import_failed} sub="last 30 days" />
-        <Stat label="Failed verdicts" value={verdicts.failed} sub="stored workflows" />
         <Stat label="Spend (30d)" value={formatMoney(cost.total_cost) ?? '$0.00'} sub={`${cost.users} active user${cost.users === 1 ? '' : 's'}`} />
       </section>
 

@@ -208,6 +208,28 @@ before/after" gap and lays the groundwork Phase 7 (Remediation Loop) needs:
 reassessment now has a real baseline to compare against. 6 persistence tests
 (`tests/scanPersistence.test.js`).
 
+## Phase 8 — AI Operations Dashboard Integration — ✅ done (org-level)
+
+Surfaces governance everywhere it belongs — reusing existing surfaces, not new
+ones — fed by the real `governance_scans` data (Phases 5–7).
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 8.1 Governance status per Blueprint | ✅ | A governance strip on the Blueprint report view (`/report/[id]`) — readiness % + band, security risk, findings count, per-framework gap chips — from the latest persisted scan, linking to the full assessment. Falls back to "not scanned yet". |
+| 8.2 Org-level governance rollup | ✅ (org-wide) | `adminGovernanceRepository.governanceRollup()` + `/admin/governance` — the "Risk & Governance" module populated with REAL data: avg readiness, risk distribution, and the risk rows **workflows without an owner / sensitive-data usage / missing approvals / outdated outputs (version drift) / third-party processors to review**, each linking to the offending Blueprints, plus a lowest-readiness triage table. |
+| 8.3 Admin visibility | ✅ | Reuses the existing admin surface — new sidebar item, an overview stat tile + view card, and a **Governance column** (readiness % + risk) added to the existing `/admin/blueprints` list. No separate surface. |
+
+**Honest scope (documented in the UI, not faked):**
+- **Org-wide, not department-level** — there is no org/department model yet (the
+  AI Adoption Intelligence dependency). Department rollup is blocked on it; shipped
+  org-wide, which the spec says "is still useful on its own." Stated on the page.
+- **Duplicate-platform detection** — needs a platform-category taxonomy (same job,
+  different tool) that doesn't exist; marked "not yet available" rather than guessed.
+- The rollup reads the LATEST scan per Blueprint; blueprints never scanned show as
+  "unscanned" (real state — verified 0/15 scanned in dev until scans are run).
+
+3 rollup tests (`tests/adminGovernance.test.js`).
+
 ## Phase 7 — Remediation Loop — ✅ done
 
 Closes the loop: regenerate a workflow seeded with its own scan findings, track

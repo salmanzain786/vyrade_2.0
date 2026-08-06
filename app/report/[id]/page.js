@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { assertBlueprintOwner } from '@/lib/auth/ownership';
 import { getLatest } from '@/lib/services/blueprintRepository.js';
 import { generateBlueprintReport } from '@/lib/services/report/blueprintReport.js';
+import { getLatestScan } from '@/lib/services/scanner/scanRepository';
 import { VyradeMark } from '@/components/VyradeLogo';
 import PrintButton from '@/components/report/PrintButton';
 import { cn, formatMoney } from '@/lib/utils';
@@ -42,6 +43,12 @@ export default async function ReportPage({ params }) {
   });
   const s = report.sections;
 
+  // Phase 8.1 — governance status per Blueprint, from the latest persisted scan.
+  const gov = await getLatestScan(params.id).catch(() => null);
+  const govFrameworks = gov?.report?.overall?.framework_alignment || [];
+  const govBandTone = (p) => (p == null ? 'text-muted-foreground' : p >= 85 ? 'text-emerald-600 dark:text-emerald-400' : p >= 70 ? 'text-blue-600 dark:text-blue-400' : p >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400');
+  const govRiskTone = { High: 'text-red-600 dark:text-red-400', Medium: 'text-amber-600 dark:text-amber-400', Low: 'text-emerald-600 dark:text-emerald-400' };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border print:hidden">
@@ -64,6 +71,44 @@ export default async function ReportPage({ params }) {
           <p className="mt-1 text-xs text-muted-foreground">
             Version {report.blueprint_version} · Confidence: <span className="capitalize">{report.confidence}</span>
           </p>
+        </div>
+
+        {/* Governance status (Phase 8.1) — from the latest governance scan */}
+        <div className="mb-8 rounded-lg border border-border bg-card p-4 print:hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Governance &amp; Compliance</span>
+            <Link href={`/compliance/${params.id}`} className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
+              {gov ? 'View full assessment →' : 'Run a scan →'}
+            </Link>
+          </div>
+          {gov ? (
+            <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3">
+              <div>
+                <div className="text-[11px] text-muted-foreground">Readiness</div>
+                <div className={`text-xl font-bold ${govBandTone(gov.readiness_pct)}`}>{gov.readiness_pct}%<span className="ml-1 text-xs font-normal text-muted-foreground">{gov.readiness_band}</span></div>
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground">Security risk</div>
+                <div className={`text-xl font-bold ${govRiskTone[gov.security_risk_level] || ''}`}>{gov.security_risk_level || '—'}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground">Findings</div>
+                <div className="text-xl font-bold">{gov.findings_total}</div>
+              </div>
+              {govFrameworks.length > 0 && (
+                <div>
+                  <div className="text-[11px] text-muted-foreground">Frameworks</div>
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {govFrameworks.map((fw) => (
+                      <span key={fw.framework} className={`rounded border px-1.5 py-0.5 text-[10px] ${fw.gap_areas ? 'border-amber-500/30 text-amber-600 dark:text-amber-400' : 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400'}`}>{fw.framework}: {fw.gap_areas ? `${fw.gap_areas} gap${fw.gap_areas === 1 ? '' : 's'}` : 'ok'}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">This automation hasn’t been scanned for governance &amp; compliance yet.</p>
+          )}
         </div>
 
         {/* 1. Business problem */}
