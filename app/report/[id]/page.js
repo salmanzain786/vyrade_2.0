@@ -49,7 +49,10 @@ export default async function ReportPage({ params }) {
           <Link href={`/chat/${record.session_id || ''}`} className="flex items-center gap-2">
             <VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span>
           </Link>
-          <PrintButton />
+          <div className="flex items-center gap-3 print:hidden">
+            <Link href={`/compliance/${params.id}`} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">Governance &amp; Compliance</Link>
+            <PrintButton />
+          </div>
         </div>
       </header>
 

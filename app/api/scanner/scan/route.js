@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth/guard';
 import { assertBlueprintOwner } from '@/lib/auth/ownership';
-import { scanWorkflow, SUPPORTED_PLATFORMS } from '@/lib/services/scanner/scan';
-import { assessOperationalControls } from '@/lib/services/scanner/operationalControls';
-import { getScanContextForBlueprint } from '@/lib/services/scanner/scanRepository';
-import { mapFrameworks } from '@/lib/services/scanner/frameworks';
-import { generateAssessmentReport } from '@/lib/services/scanner/report';
-import { summarize, rankFindings } from '@/lib/services/scanner/model';
+import { scanWorkflow, scanContext, SUPPORTED_PLATFORMS } from '@/lib/services/scanner/scan';
+import { getScanContextForBlueprint, saveScan, getLatestScan } from '@/lib/services/scanner/scanRepository';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,27 +13,26 @@ export const dynamic = 'force-dynamic';
 export const POST = withAuth(async (user, request) => {
   const body = await request.json().catch(() => ({}));
 
-  // ── Blueprint-scoped full scan (Phases 1–3) ──
+  // ── Blueprint-scoped full scan (Phases 1–3), persisted for history ──
   if (body.blueprintId) {
     await assertBlueprintOwner(user, body.blueprintId);
     const ctx = await getScanContextForBlueprint(body.blueprintId).catch(() => null);
     if (!ctx) return NextResponse.json({ error: 'Blueprint not found' }, { status: 404 });
 
-    // No generated workflow yet → still assess Blueprint operational controls.
-    if (!ctx.workflow) {
-      const findings = rankFindings(assessOperationalControls(ctx));
-      const framework_mapping = mapFrameworks(findings);
-      return NextResponse.json({
-        platform: ctx.platform, workflow_name: null, node_count: 0,
-        scanned_at: new Date().toISOString(), findings, summary: summarize(findings),
-        framework_mapping,
-        report: generateAssessmentReport({ findings, framework_mapping, platform: ctx.platform, node_count: 0, blueprintAssessed: true }),
-        note: 'No generated workflow for this Blueprint — operational-controls (Phase 3) only.',
-      });
-    }
     try {
-      const result = scanWorkflow(ctx);
-      return NextResponse.json({ ...result, scanned_at: new Date().toISOString() });
+      // Capture the prior scan BEFORE inserting the new one, for before/after.
+      const previous = await getLatestScan(body.blueprintId).catch(() => null);
+      const result = scanContext(ctx);
+      const scanId = await saveScan({ blueprintId: body.blueprintId, userId: user.id, ctx, result });
+      const prev = previous && { readiness_pct: previous.readiness_pct, security_risk_level: previous.security_risk_level, findings_total: previous.findings_total, scanned_at: previous.created_at };
+      return NextResponse.json({
+        ...result,
+        scan_id: scanId,
+        scanned_at: new Date().toISOString(),
+        previous: prev || null,
+        readiness_delta: prev ? result.report.overall.governance_readiness_pct - prev.readiness_pct : null,
+        ...(ctx.workflow ? {} : { note: 'No generated workflow for this Blueprint — operational-controls (Phase 3) only.' }),
+      });
     } catch (err) {
       return NextResponse.json({ error: `Scan failed: ${err.message}` }, { status: 422 });
     }

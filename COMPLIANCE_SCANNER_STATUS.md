@@ -182,6 +182,32 @@ standalone scanner — a shippable assessment product on its own.**
 Presented as a directional summary (same "don't overstate precision" principle),
 never a certification, and honest about coverage.
 
+**Customer-facing UI — ✅ done.** `app/compliance/[id]/page.js` — a
+server-rendered, ownership-gated page (mirrors `app/report/[id]`) that runs the
+scan and renders the report for a human: readiness score + band, security-risk
+and findings tiles, per-framework alignment cards, critical/high findings,
+aggregated remediations, and the full Evidence & Limitations section — plus the
+gap-assessment and pending-legal-review banners up top. Reachable via a
+**"Governance & Compliance"** link in the Blueprint report header
+(`/report/[id]` → `/compliance/[id]`). Closes the "report data exists but nobody
+can see it" gap: the report is now viewable, not just an API payload.
+
+**Scan persistence + history — ✅ done.** `sql/governance_scans.sql` (+ Drizzle
+mirror + migrate wiring) stores each scan as an immutable, timestamped snapshot
+tied to the Blueprint: headline metrics denormalised into columns (readiness,
+risk, findings, worst severity) for cheap comparison, full findings/report/
+framework payloads snapshotted as JSON. `scanContext()` is the one shared
+compute path (route + page + persistence agree). Repository:
+`saveScan` (best-effort — a persistence failure never breaks the scan response),
+`getScanHistory`, `getLatestScan`. The API route persists every blueprint-scoped
+scan and returns `previous` + `readiness_delta`; the page renders the latest
+persisted snapshot (computing + persisting a baseline on first view), shows a
+**readiness delta vs. the previous scan**, a **Scan history** table, and a
+**"Re-scan now"** button. Closes the "scans aren't persisted — no history, no
+before/after" gap and lays the groundwork Phase 7 (Remediation Loop) needs:
+reassessment now has a real baseline to compare against. 6 persistence tests
+(`tests/scanPersistence.test.js`).
+
 ## Deferred to Phase 6 (decided & tracked — not gaps, not silent)
 
 These need a NEW Blueprint field/schema (Phase 6), so they are deliberately NOT
