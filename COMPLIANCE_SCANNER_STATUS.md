@@ -166,27 +166,21 @@ shipped as authoritative before that happens:
 
 **Owner: you (source an external compliance/legal reviewer). Status: PENDING.**
 
-## Phase 5 — Assessment Report Generation — ⬜ NOT STARTED
+## Phase 5 — Assessment Report Generation — ✅ done
 
-**Explicit:** Phase 4 produces the framework_mapping DATA STRUCTURE (per-area
-status, gap counts, disclaimer, review state). It is **not** the customer-facing
-report. "Phase 4 done" ≠ "the report is done" — they are different milestones.
+`lib/services/scanner/report.js` — `generateAssessmentReport()` over the Phase
+1–4 outputs, attached to every scan as `report`. **This is the end of the
+standalone scanner — a shippable assessment product on its own.**
 
-What the scanner returns today (Phases 1–4): `findings` (each with a
-`remediation` string), a directional `summary` (`risk_level`, `by_severity`,
-`worst_severity`, `manual_review_count`), and `framework_mapping`.
+| Milestone | Status |
+|---|---|
+| 5.1 Overall assessment summary | ✅ `governance_readiness_pct` (+ band) + `security_risk_level` + `framework_alignment`. Directional: readiness deducts per DISTINCT finding type (not per node), so repetition doesn't crater the score. Real fixture → **70% Moderate / High risk**. |
+| 5.2 Critical / high-priority findings | ✅ `priority_findings.{critical, high}`, severity-tiered |
+| 5.3 Remediation recommendations | ✅ aggregated by type, prioritised, with affected nodes + a **Phase 6 Blueprint-remediation hint** on governance items |
+| 5.4 Evidence & limitations | ✅ first-class: what was detected from the **workflow** vs. inherited from the **Blueprint** (or not, if no context) vs. **not assessed** (Phase 6 / manual) vs. **out of scope** (infra/runtime/secret values/org policy). Carries the "gap assessment, not certification" disclaimer + the pending-legal-review flag. |
 
-**Not built yet (Phase 5, ~5–6 days):**
-- 5.1 Overall assessment summary — **governance readiness %**, overall
-  security-risk level as a composite score
-- 5.2 Critical / high-priority findings sections (formatted report output)
-- 5.3 Remediation-recommendations **summary/engine** (per-finding `remediation`
-  exists; an aggregated, prioritised recommendations section does not)
-- 5.4 **Evidence & limitations** transparency section
-- No `governance_readiness` / `evidence_and_limitations` generation exists in the
-  repo — confirmed by grep.
-
-Owner: Salman, when Phase 5 is scheduled.
+Presented as a directional summary (same "don't overstate precision" principle),
+never a certification, and honest about coverage.
 
 ## Deferred to Phase 6 (decided & tracked — not gaps, not silent)
 
