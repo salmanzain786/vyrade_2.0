@@ -92,6 +92,29 @@ in its remediation text.
 Verified on real Vyrade workflows: the email/spreadsheet workflows surface
 `pii_detected` + `third_party_processor` alongside the security findings.
 
+## Phase 3 — Operational controls (✅ done)
+
+`lib/services/scanner/operationalControls.js` — reads BLUEPRINT metadata +
+version history (not the workflow file). Run by `scanWorkflow` when Blueprint
+context is passed, and by `POST /api/scanner/scan { blueprintId }` (full scan).
+
+| Milestone | Status | Finding |
+|---|---|---|
+| 3.1 Owner / approval | ✅ | `no_owner_assigned` (owner = user_id absent) · `approval_unspecified` (human_approval.required is null) |
+| 3.2 Manual fallback / incident notification | ✅ | `no_exception_handling` (empty exception_rules) · `no_incident_notification` (empty notification_rules) |
+| 3.3 Change control / version history | ✅ | `no_version_iteration` (≤1 stored version) |
+
+**Confirmed populated in practice (the doc's dependency), not just in schema.**
+Across 15 real blueprints: 9 lack exception handling, 10 are single-version, 7
+lack notification, 2 have no owner — and **0** `approval_unspecified` (real
+blueprints DO record the approval decision). So the checks are meaningful, not
+always-firing. All findings are **manual review** (governance, not auto-pass).
+
+**NOT captured today → Phase 6 (documented in code, not per-scan findings):**
+`acceptance_criteria` (no such field), dedicated accountable-owner /
+approval-owner / exception-owner fields (only creator `user_id` exists), and
+policy-explicit approval directives. Same reasoning as DSAR.
+
 ## Still open (unchanged product decisions, not code)
 - Phase 6 (Blueprint-aware comparison) in v1, or ship Phases 1–5 standalone first?
 - Who owns the Governance & Policy Requirements taxonomy (6.1)?
