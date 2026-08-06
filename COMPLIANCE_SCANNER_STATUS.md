@@ -102,6 +102,7 @@ context is passed, and by `POST /api/scanner/scan { blueprintId }` (full scan).
 |---|---|---|
 | 3.1 Owner / approval | ✅ | `no_owner_assigned` (owner = user_id absent) · `approval_unspecified` (human_approval.required is null) |
 | 3.2 Manual fallback / incident notification | ✅ | `no_exception_handling` (empty exception_rules) · `no_incident_notification` (empty notification_rules) |
+| 3.4 Recovery process (distinct from 3.2) | ✅ | `no_recovery_process` — derived from a retry `after_final_failure` action or an exception behavior describing recovery (restart/resume/reconcile/replay/rollback/restore). Manual fallback = handle a failure; recovery = restore to a working state afterward. Real data: 10/15 lack it. |
 | 3.3 Change control / version history | ✅ | `no_version_iteration` (≤1 stored version) |
 
 **Confirmed populated in practice (the doc's dependency), not just in schema.**
@@ -112,10 +113,29 @@ always-firing. All findings are **manual review** (governance, not auto-pass).
 
 **NOT captured today → Phase 6 (documented in code, not per-scan findings):**
 `acceptance_criteria` (no such field), dedicated accountable-owner /
-approval-owner / exception-owner fields (only creator `user_id` exists), and
-policy-explicit approval directives. Same reasoning as DSAR.
+approval-owner / exception-owner fields (only creator `user_id` exists),
+policy-explicit approval directives, and **monitoring requirements** (client
+review: ongoing error-rate thresholds / SLA targets / "what to watch" — no field
+exists; `volume.estimated_executions` is on every blueprint so a check keyed on
+it never fires, and `latency_requirement` is a performance constraint, not a
+monitoring plan → Phase 6 schema addition, not a noisy Phase 3 heuristic). Same
+reasoning as DSAR.
 
-## Still open (unchanged product decisions, not code)
+## Deferred to Phase 6 (decided & tracked — not gaps, not silent)
+
+These need a NEW Blueprint field/schema (Phase 6), so they are deliberately NOT
+Phase 2/3 checks. Each is disclosed in code; consolidated here so it's tracked
+in one place, not only in comments.
+
+| Item | Why Phase 6 (not now) |
+|---|---|
+| **Distinct owner roles** — workflow owner / **approval owner** / **exception owner** (3 separate roles per the spec) | Today only the creating `user_id` exists (the general owner). Approval-owner and exception-owner are new accountability fields. Phase 3's `no_owner_assigned` covers the general owner only — confirmed intentional. |
+| DSAR — deletion & access (data-subject rights) | Cross-system org capability, not inferable from a workflow. |
+| `acceptance_criteria` | No such field exists. |
+| Monitoring requirements (error-rate thresholds, SLA targets, "what to watch") | No field; `volume` is always present (check never fires), `latency` is a perf constraint. |
+| Policy-explicit directives — retry limit N, "consent required before X", "retain N days", recovery-runbook | The generic/structural half is already checked in Phase 1–3; the policy-specific limits are Blueprint-declared → Phase 6 diff engine. |
+
+## Still open (product decisions, not code)
 - Phase 6 (Blueprint-aware comparison) in v1, or ship Phases 1–5 standalone first?
 - Who owns the Governance & Policy Requirements taxonomy (6.1)?
 - Legal/compliance review of the framework-mapping content (Phase 4)?

@@ -7,6 +7,7 @@ const governed = {
   human_approval: { required: true, approval_points: ['before send'] },
   exception_rules: [{ exception_id: 'e1', scenario: 'API down', behavior: 'notify ops and retry manually', data_changes: null }],
   notification_rules: [{ channel_system: 'Slack', condition: 'on failure', event: 'error', audience: 'ops' }],
+  retry_requirements: [{ system: 'CRM', max_retries: 3, after_final_failure: 'reconcile and resume from last checkpoint' }],
 };
 
 describe('operational controls (Phase 3)', () => {
@@ -16,7 +17,21 @@ describe('operational controls (Phase 3)', () => {
     expect(t).toContain('approval_unspecified');    // 3.1
     expect(t).toContain('no_exception_handling');   // 3.2
     expect(t).toContain('no_incident_notification');// 3.2
+    expect(t).toContain('no_recovery_process');     // 3.4 (distinct from fallback)
     expect(t).toContain('no_version_iteration');    // 3.3
+  });
+
+  it('3.4 recognises a recovery process from an after-final-failure action (distinct from manual fallback)', () => {
+    const withRecovery = { ...bare, retry_requirements: [{ system: 'API', max_retries: 3, after_final_failure: 'replay from checkpoint' }] };
+    const t = new Set(assessOperationalControls({ blueprint: withRecovery, versionCount: 1, owner: 'a@b.com' }).map((f) => f.type));
+    expect(t).not.toContain('no_recovery_process');
+    expect(t).toContain('no_exception_handling'); // manual fallback still separately missing
+  });
+
+  it('3.4 recognises recovery described in an exception behavior', () => {
+    const bp = { ...bare, exception_rules: [{ exception_id: 'e', scenario: 'x', behavior: 'restart the run and reconcile records', data_changes: null }] };
+    const t = new Set(assessOperationalControls({ blueprint: bp, versionCount: 1, owner: 'a@b.com' }).map((f) => f.type));
+    expect(t).not.toContain('no_recovery_process');
   });
 
   it('passes a fully-governed Blueprint with an owner + version history', () => {
