@@ -1,13 +1,16 @@
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldCheck, AlertTriangle, FileWarning, ClipboardList, Eye, History, ArrowUp, ArrowDown, Minus, GitCompareArrows, CheckCircle2, XCircle } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, FileWarning, ClipboardList, Eye, History, ArrowUp, ArrowDown, Minus, GitCompareArrows, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth/session';
 import { assertBlueprintOwner } from '@/lib/auth/ownership';
-import { getScanContextForBlueprint, getLatestScan, getScanHistory, saveScan } from '@/lib/services/scanner/scanRepository';
+import { getScanContextForBlueprint, getLatestScan, getScanHistory, saveScan, getLastTwoScans, getResolutions } from '@/lib/services/scanner/scanRepository';
 import { scanContext } from '@/lib/services/scanner/scan';
+import { diffScans, detectRegressions, findingKey } from '@/lib/services/scanner/reassessment';
 import { VyradeMark } from '@/components/VyradeLogo';
 import RescanButton from '@/components/scanner/RescanButton';
 import PolicyEditor from '@/components/scanner/PolicyEditor';
+import RemediateButton from '@/components/scanner/RemediateButton';
+import FindingStatus from '@/components/scanner/FindingStatus';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +60,15 @@ export default async function CompliancePage({ params }) {
   const prev = history[1] || null; // history[0] is the current scan
   const delta = prev ? latest.readiness_pct - prev.readiness_pct : null;
 
+  // Phase 7 — reassessment (before/after) + resolution tracking + regressions.
+  const [twoScans, resolutions] = await Promise.all([
+    getLastTwoScans(params.id).catch(() => []),
+    getResolutions(params.id).catch(() => ({})),
+  ]);
+  const reassessment = twoScans.length >= 2 ? diffScans({ current: twoScans[0], previous: twoScans[1] }) : null;
+  const regressions = detectRegressions(latest.findings || [], resolutions);
+  const regressionKeys = new Set(regressions.map(findingKey));
+
   const scan = { workflow_name: latest.workflow_name, node_count: latest.node_count, summary: latest.summary || {} };
   const r = latest.report;
   const o = r.overall;
@@ -64,16 +76,25 @@ export default async function CompliancePage({ params }) {
   const pc = r.policy_compliance || null;
   const PC_TONE = { compliant: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400', violations: 'border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-400', no_policy: 'border-border bg-muted/30 text-muted-foreground', policy_disabled: 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400' };
 
-  const FindingRow = ({ f }) => (
-    <div className="flex items-start gap-3 border-b border-border py-2.5 last:border-0">
-      <Badge severity={f.severity} />
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium">{f.title}</div>
-        <div className="mt-0.5 text-xs text-muted-foreground">{f.detail}</div>
-        {f.node && <div className="mt-0.5 text-[11px] text-muted-foreground">Node: <span className="font-mono">{f.node}</span></div>}
+  const FindingRow = ({ f }) => {
+    const key = findingKey(f);
+    const res = resolutions[key];
+    const dimmed = res && (res.status === 'resolved' || res.status === 'accepted_risk');
+    return (
+      <div className={`flex items-start gap-3 border-b border-border py-2.5 last:border-0 ${dimmed ? 'opacity-55' : ''}`}>
+        <Badge severity={f.severity} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {f.title}
+            {regressionKeys.has(key) && <span className="rounded bg-red-600/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-400">regression</span>}
+          </div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{f.detail}</div>
+          {f.node && <div className="mt-0.5 text-[11px] text-muted-foreground">Node: <span className="font-mono">{f.node}</span></div>}
+        </div>
+        <FindingStatus blueprintId={params.id} type={f.type} node={f.node} initial={res?.status || 'open'} />
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -82,7 +103,10 @@ export default async function CompliancePage({ params }) {
           <Link href={`/report/${params.id}`} className="flex items-center gap-2">
             <VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span>
           </Link>
-          <RescanButton blueprintId={params.id} />
+          <div className="flex items-center gap-3">
+            <RemediateButton blueprintId={params.id} />
+            <RescanButton blueprintId={params.id} />
+          </div>
         </div>
       </header>
 
@@ -129,6 +153,40 @@ export default async function CompliancePage({ params }) {
           </div>
         </div>
         <p className="mt-2 text-center text-[11px] text-muted-foreground">{o.caveat}</p>
+
+        {/* 7.3 Reassessment — before/after vs the previous scan */}
+        {reassessment?.has_previous && (reassessment.counts.resolved + reassessment.counts.new) > 0 && (
+          <Card title="Since the last scan" icon={RotateCcw}>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" />{reassessment.counts.resolved} resolved</span>
+              <span className="inline-flex items-center gap-1.5 text-red-600 dark:text-red-400"><AlertTriangle className="h-4 w-4" />{reassessment.counts.new} new</span>
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Minus className="h-4 w-4" />{reassessment.counts.persisting} still open</span>
+              {reassessment.readiness_delta != null && reassessment.readiness_delta !== 0 && (
+                <span className={`inline-flex items-center gap-1 font-medium ${reassessment.readiness_delta > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {reassessment.readiness_delta > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}readiness {reassessment.readiness_delta > 0 ? '+' : ''}{reassessment.readiness_delta} pts
+                </span>
+              )}
+            </div>
+            {reassessment.resolved.length > 0 && (
+              <div className="mt-3">
+                <div className="text-xs font-medium text-muted-foreground">Resolved</div>
+                <ul className="mt-1 space-y-0.5">{reassessment.resolved.slice(0, 8).map((f, i) => <li key={i} className="text-xs text-emerald-700 line-through dark:text-emerald-400">{f.title}{f.node ? ` — ${f.node}` : ''}</li>)}</ul>
+              </div>
+            )}
+            {reassessment.new.length > 0 && (
+              <div className="mt-3">
+                <div className="text-xs font-medium text-muted-foreground">Newly introduced</div>
+                <ul className="mt-1 space-y-0.5">{reassessment.new.slice(0, 8).map((f, i) => <li key={i} className="text-xs text-red-700 dark:text-red-400">{f.title}{f.node ? ` — ${f.node}` : ''}</li>)}</ul>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {regressions.length > 0 && (
+          <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-700 dark:text-red-400">
+            <strong>{regressions.length} regression{regressions.length === 1 ? '' : 's'}.</strong> {regressions.length === 1 ? 'A finding' : 'Findings'} you marked resolved {regressions.length === 1 ? 'has' : 'have'} reappeared in the latest scan — see the “regression” tags below.
+          </div>
+        )}
 
         {/* Framework alignment */}
         <Card title="Framework alignment" icon={ShieldCheck}>

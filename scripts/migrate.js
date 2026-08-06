@@ -61,6 +61,7 @@ async function migrate() {
   await runFile(connection, 'subscriptions.sql', { tolerant: true });
   await runFile(connection, 'governance_scans.sql', { tolerant: true });
   await runFile(connection, 'blueprint_policies.sql', { tolerant: true });
+  await runFile(connection, 'finding_resolutions.sql', { tolerant: true });
 
   console.log('Migration applied successfully.');
   await connection.end();

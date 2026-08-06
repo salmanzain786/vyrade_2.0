@@ -208,6 +208,26 @@ before/after" gap and lays the groundwork Phase 7 (Remediation Loop) needs:
 reassessment now has a real baseline to compare against. 6 persistence tests
 (`tests/scanPersistence.test.js`).
 
+## Phase 7 — Remediation Loop — ✅ done
+
+Closes the loop: regenerate a workflow seeded with its own scan findings, track
+each finding's resolution, and re-scan to PROVE the fix landed (before/after) —
+not just that a recommendation was made. Builds directly on Phase 5 persistence
+(the before/after baseline) and Phase 6 (knowing what to regenerate against).
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 7.1 Regenerate from Blueprint (seeded) | ✅ | `remediation.js#buildRemediationBrief` maps addressable findings → concrete directives ("retry ≤ 3", "add an approval/wait step", "org-owned creds", "add error branch"), honouring the active policy's limits. Injected into the EXISTING generator (`n8nSpecialist.generateN8nWorkflow` gained a `remediationBlock` param; threaded via `blueprintService.generateWorkflow`) — reuse, not reinvent. **Honest split:** privacy/process items (PII, DSAR, framework gaps) are surfaced as *advisory*, never promised as rebuild-fixable. `POST /api/scanner/remediate`. |
+| 7.2 Resolution tracking | ✅ | `finding_resolutions` table (+ Drizzle + migrate) keyed by finding identity (`type::node`); status open / in_progress / resolved / accepted_risk (marking `open` deletes the row). Repo `getResolutions`/`setResolution`; `PUT /api/scanner/resolution`; per-finding `<FindingStatus>` dropdown on the compliance page; resolved/accepted rows are dimmed. |
+| 7.3 Reassessment (before/after) | ✅ | `reassessment.js#diffScans` diffs the last two persisted snapshots by finding identity → resolved / new / persisting + readiness delta + risk change. `POST /api/scanner/remediate` returns explicit before→after. "Since the last scan" panel on the page. **Regression detection** (`detectRegressions`): a finding marked *resolved* that reappears is tagged `regression` — ties 7.2 to 7.3. |
+
+**The closed loop, end to end:** scan → mark/triage findings → "Regenerate to
+fix findings" (rebuilds via Vyrade's generator, seeded with the findings) →
+auto-re-scan → before/after delta + resolved list, with regressions caught if a
+"resolved" issue returns. 12 tests (`tests/remediationLoop.test.js`,
+`tests/resolutionRepo.test.js`). The regeneration step is a real (billed) LLM
+call, gated behind a user confirm.
+
 ## Phase 6 — Blueprint-Aware Comparison — ✅ engineering slice done
 
 The differentiator: "does this workflow match what was **approved**?" Phases 1–3
