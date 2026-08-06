@@ -143,8 +143,50 @@ not-assessed, HIPAA 4, SOC 2 5.
 `FRAMEWORK_DISCLAIMER` and returned with every mapping — so the report/UI can't
 forget it. Absence of a finding never claims compliance.
 
-> **Framework content should get a legal/compliance review before shipping**
-> (an Open Question below) — the mappings are engineering-reasonable, not legal advice.
+### Legal/compliance review of the mapping content — REQUIRED, externally owned
+
+The GDPR/HIPAA/SOC 2 mappings are engineering-reasonable, **not legal advice**.
+Whether each area↔finding mapping and statutory citation is legally accurate is a
+domain-expert call. This is **not an engineering task** — it must be sourced from
+a qualified compliance/legal reviewer. Engineering has set it up so it can't be
+shipped as authoritative before that happens:
+
+- **Product gate (code):** `FRAMEWORK_REVIEW.status = 'unreviewed'` in
+  `frameworks.js`; `mapFrameworks` returns a `review` object with a warning
+  ("NOT yet reviewed by a compliance professional — do not present as
+  authoritative"). The report/UI must surface this until sign-off.
+- **Reviewer artifact:** `COMPLIANCE_MAPPING_REVIEW.md` (regenerate with
+  `npm run review:mapping`) — every area, its triggering finding types, a
+  finding-type glossary, and Confirm/Correct + comment columns, plus the specific
+  questions to scrutinise (e.g. is `approval_unspecified` right for GDPR Art. 22;
+  are the HIPAA §164.312/§164.308 citations complete). Ends with a sign-off block.
+- **On sign-off:** the reviewer's corrections go into `frameworks.js`, then set
+  `FRAMEWORK_REVIEW = { status:'reviewed', reviewer, reviewed_at }` — which clears
+  the warning in the product.
+
+**Owner: you (source an external compliance/legal reviewer). Status: PENDING.**
+
+## Phase 5 — Assessment Report Generation — ⬜ NOT STARTED
+
+**Explicit:** Phase 4 produces the framework_mapping DATA STRUCTURE (per-area
+status, gap counts, disclaimer, review state). It is **not** the customer-facing
+report. "Phase 4 done" ≠ "the report is done" — they are different milestones.
+
+What the scanner returns today (Phases 1–4): `findings` (each with a
+`remediation` string), a directional `summary` (`risk_level`, `by_severity`,
+`worst_severity`, `manual_review_count`), and `framework_mapping`.
+
+**Not built yet (Phase 5, ~5–6 days):**
+- 5.1 Overall assessment summary — **governance readiness %**, overall
+  security-risk level as a composite score
+- 5.2 Critical / high-priority findings sections (formatted report output)
+- 5.3 Remediation-recommendations **summary/engine** (per-finding `remediation`
+  exists; an aggregated, prioritised recommendations section does not)
+- 5.4 **Evidence & limitations** transparency section
+- No `governance_readiness` / `evidence_and_limitations` generation exists in the
+  repo — confirmed by grep.
+
+Owner: Salman, when Phase 5 is scheduled.
 
 ## Deferred to Phase 6 (decided & tracked — not gaps, not silent)
 

@@ -17,6 +17,12 @@ describe('framework mapping (Phase 4)', () => {
     expect(FRAMEWORK_DISCLAIMER).toMatch(/gap assessment/i);
   });
 
+  it('carries a pending legal-review status until a reviewer signs off', () => {
+    const r = mapFrameworks(findings);
+    expect(r.review.status).toBe('unreviewed');
+    expect(r.review.warning).toMatch(/not yet been reviewed by a compliance/i);
+  });
+
   it('produces GDPR, HIPAA and SOC 2, each with an area table', () => {
     const r = mapFrameworks(findings);
     expect(r.frameworks.map((f) => f.framework)).toEqual(['GDPR', 'HIPAA', 'SOC 2']);

@@ -15,6 +15,7 @@
     "smoke:n8n": "node scripts/n8n-smoke.js",
     "admin:set": "node scripts/set-admin.mjs",
     "qa:admin": "node scripts/qa-admin.mjs",
+    "review:mapping": "node scripts/gen-mapping-review.mjs",
     "seed:pricing": "node scripts/seed-pricing.mjs",
     "curate:workflows": "node scripts/curate-workflows.mjs",
     "seed:tools": "node scripts/seed-tools.mjs",
