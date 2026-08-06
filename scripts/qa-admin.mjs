@@ -3,8 +3,10 @@
  *
  * Seeds KNOWN-BAD rows (a blocked/low-readiness blueprint, a failed generation +
  * import failure, a failing node, a doc gap, a blocked user, a cost spike, a
- * recommendation override), then runs each REAL admin view function and asserts
- * the seeded rows surface. Prints evidence, cleans up, exits non-zero on any miss.
+ * recommendation override, and a low-readiness/high-risk governance scan that
+ * trips every Risk & Governance rollup row), then runs each REAL admin view
+ * function and asserts the seeded rows surface. Prints evidence, cleans up,
+ * exits non-zero on any miss.
  *
  *   node scripts/qa-admin.mjs            # seed → verify → clean up
  *   node scripts/qa-admin.mjs --keep     # leave the seed data in place
@@ -46,6 +48,7 @@ const cfg = {
 };
 
 async function cleanup(c) {
+  await c.query('DELETE FROM governance_scans WHERE blueprint_id = ?', [ID.bp]);
   await c.query('DELETE FROM export_runs WHERE blueprint_id = ?', [ID.bp]);
   await c.query('DELETE FROM operational_events WHERE blueprint_id = ? OR tool = ?', [ID.bp, TOOL]);
   await c.query('DELETE FROM conversation_messages WHERE session_id = ?', [ID.session]);
@@ -96,6 +99,25 @@ async function seed(c) {
   // Recommendation override
   await c.query('INSERT INTO export_runs (id, blueprint_id, blueprint_version, user_id, selected_platform, kind, recommended_platform, followed_recommendation, is_recommendation_override, override_reason) VALUES (?,?,1,?,?,?,?,0,1,?)',
     [ID.exp, ID.bp, ID.user, 'zapier', 'workflow', 'n8n', 'user_selected_platform']);
+  // Governance scan (Phase 8) — a low-readiness, high-risk scan whose findings
+  // trip EVERY Risk & Governance rollup row (ownerless, sensitive data, missing
+  // approval, outdated version, third-party processor).
+  const govFindings = [
+    { type: 'no_owner_assigned', severity: 'medium', title: 'No owner assigned', detail: 'qa', node: null },
+    { type: 'pii_detected', severity: 'high', title: 'PII detected', detail: 'qa', node: 'Email node' },
+    { type: 'policy_approval_missing', severity: 'high', title: 'Approval missing', detail: 'qa', node: null },
+    { type: 'workflow_version_drift', severity: 'medium', title: 'Outdated Blueprint version', detail: 'qa', node: null },
+    { type: 'third_party_processor', severity: 'low', title: 'Third-party processor', detail: 'qa', node: 'HTTP node' },
+  ];
+  await c.query(
+    `INSERT INTO governance_scans (blueprint_id, user_id, platform, workflow_name, node_count, version_count, had_workflow,
+       readiness_pct, readiness_band, security_risk_level, findings_total, worst_severity, manual_review_count,
+       summary_json, findings_json, report_json, framework_json)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [ID.bp, ID.user, 'n8n', NAME, 5, 1, 1, 30, 'Weak', 'High', govFindings.length, 'high', 3,
+     JSON.stringify({ total: 5 }), JSON.stringify(govFindings),
+     JSON.stringify({ overall: { governance_readiness_pct: 30 } }), JSON.stringify({ frameworks: [] })]
+  );
 }
 
 async function verify(c) {
@@ -103,6 +125,7 @@ async function verify(c) {
   const F = await import('../lib/services/admin/adminFailuresRepository.js');
   const K = await import('../lib/services/admin/adminCostRepository.js');
   const I = await import('../lib/services/insights/operationalInsightsRepository.js');
+  const G = await import('../lib/services/admin/adminGovernanceRepository.js');
 
   const results = [];
   const check = (name, pass, detail) => results.push({ name, pass, detail });
@@ -113,6 +136,21 @@ async function verify(c) {
   check('Blueprints: blocked blueprint surfaces', !!qbp && qbp.status === 'blocked',
     qbp ? `status=${qbp.status} readiness=${qbp.readiness_score}%` : 'not found');
   check('Blueprints: low readiness score', qbp?.readiness_score === 12, `score=${qbp?.readiness_score}`);
+  // 8.3 Governance column on the blueprints list
+  check('Blueprints: governance column populated', qbp?.gov_readiness === 30 && qbp?.gov_risk === 'High',
+    `gov=${qbp?.gov_readiness}% risk=${qbp?.gov_risk}`);
+
+  // 8.2 Governance rollup — each Risk & Governance row surfaces the seeded scan
+  const gv = await G.governanceRollup();
+  const inRow = (key) => (gv.risk_items[key]?.blueprints || []).some((b) => b.id === ID.bp);
+  check('Governance: QA blueprint counted as scanned', gv.scanned >= 1, `scanned=${gv.scanned}/${gv.total_blueprints}`);
+  check('Governance: no-owner row surfaces QA', inRow('no_owner'), `count=${gv.risk_items.no_owner.count}`);
+  check('Governance: sensitive-data row surfaces QA', inRow('sensitive_data'), `count=${gv.risk_items.sensitive_data.count}`);
+  check('Governance: missing-approvals row surfaces QA', inRow('missing_approvals'), `count=${gv.risk_items.missing_approvals.count}`);
+  check('Governance: outdated-outputs row surfaces QA', inRow('outdated_outputs'), `count=${gv.risk_items.outdated_outputs.count}`);
+  check('Governance: processors-to-review row surfaces QA', inRow('processors_to_review'), `count=${gv.risk_items.processors_to_review.count}`);
+  check('Governance: worst list includes low-readiness QA', gv.worst.some((w) => w.id === ID.bp && w.readiness_pct === 30),
+    `worst has QA=${gv.worst.some((w) => w.id === ID.bp)}`);
 
   // 3.4 Failures — failed generation + import + failing node + failed verdict
   const fv = await F.getFailuresView({ days: 2 });

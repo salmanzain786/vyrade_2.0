@@ -228,7 +228,11 @@ ones — fed by the real `governance_scans` data (Phases 5–7).
 - The rollup reads the LATEST scan per Blueprint; blueprints never scanned show as
   "unscanned" (real state — verified 0/15 scanned in dev until scans are run).
 
-3 rollup tests (`tests/adminGovernance.test.js`).
+3 rollup tests (`tests/adminGovernance.test.js`), **plus** the governance page is
+now covered by the seeded-integration QA harness (`scripts/qa-admin.mjs`) like
+every other admin view: it seeds a low-readiness/high-risk scan whose findings
+trip all five Risk & Governance rows + the blueprints-list governance column, and
+asserts each surfaces (8 new checks, all green; seed cleaned up after).
 
 ## Phase 7 — Remediation Loop — ✅ done
 
