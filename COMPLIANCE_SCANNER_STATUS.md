@@ -243,11 +243,14 @@ the fixture doesn't have (no false positives). Readiness 70% → 50% under polic
    workflow = the implementation checked against it.
 2. **Opt-in** — no authored/enabled policy ⇒ no policy findings and an explicit
    "no policy defined" state in the report (honest, not silent, not noisy).
-3. **Capture point** — authoring is a governance panel on the compliance page,
-   **not** forced into the chat Blueprint-creation flow. The spec's 6.1 suggests
-   creation-time capture; that's a larger, riskier change to a working funnel and
-   a genuine product call left to the client. Everything is in place to move the
-   editor into the creation flow later without touching the engine.
+3. **Capture point** — ✅ **DECIDED by client (2026-08-06): keep as-is** — an
+   opt-in governance panel on the compliance page, authored after the fact, **not**
+   forced into the chat Blueprint-creation flow. Rationale: lower friction on
+   Blueprint creation; governance authoring happens for the teams that actually
+   want it (consistent with the verified data — policy-adjacent fields were
+   near-zero populated before this phase). The engine supports either path, so if
+   "require at creation time" is ever wanted it's a separately-scoped funnel/UI
+   change, not a Phase 6 code gap.
 
 **Not done (needs the client / non-engineering):** the deeper 6.1 "required at
 creation time" product decision + funnel UI; ownership of the policy taxonomy;
@@ -269,9 +272,9 @@ The rest remain genuinely non-inferable (need org-level fields or human input).
 | Policy-explicit directives — retry limit N, "consent required before X", "retain N days", recovery-runbook | The generic/structural half is already checked in Phase 1–3; the policy-specific limits are Blueprint-declared → Phase 6 diff engine. |
 
 ## Still open (product decisions, not code)
-- **Phase 6 capture point**: move the policy editor into the chat Blueprint-creation
-  flow (spec 6.1), or keep it as the compliance-page governance panel? (Engine is
-  ready either way.)
+- ~~Phase 6 capture point~~ — ✅ **RESOLVED (2026-08-06):** client chose to keep
+  the opt-in governance panel on the compliance page (author after the fact); no
+  creation-flow change. Engine already implements this — no code change required.
 - Who owns the Governance & Policy Requirements taxonomy (6.1)? (Default schema
   shipped; taxonomy ownership still a client call.)
 - Legal/compliance review of the framework-mapping content (Phase 4)?
