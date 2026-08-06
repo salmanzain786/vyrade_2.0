@@ -4,6 +4,7 @@ import { assertBlueprintOwner } from '@/lib/auth/ownership';
 import { scanWorkflow, SUPPORTED_PLATFORMS } from '@/lib/services/scanner/scan';
 import { assessOperationalControls } from '@/lib/services/scanner/operationalControls';
 import { getScanContextForBlueprint } from '@/lib/services/scanner/scanRepository';
+import { mapFrameworks } from '@/lib/services/scanner/frameworks';
 import { summarize, rankFindings } from '@/lib/services/scanner/model';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,7 @@ export const POST = withAuth(async (user, request) => {
       return NextResponse.json({
         platform: ctx.platform, workflow_name: null, node_count: 0,
         scanned_at: new Date().toISOString(), findings, summary: summarize(findings),
+        framework_mapping: mapFrameworks(findings),
         note: 'No generated workflow for this Blueprint — operational-controls (Phase 3) only.',
       });
     }

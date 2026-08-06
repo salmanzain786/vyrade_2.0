@@ -121,6 +121,31 @@ it never fires, and `latency_requirement` is a performance constraint, not a
 monitoring plan → Phase 6 schema addition, not a noisy Phase 3 heuristic). Same
 reasoning as DSAR.
 
+## Phase 4 — Framework mapping (✅ done)
+
+`lib/services/scanner/frameworks.js` — a PURE lookup mapping the stable finding
+`type` slugs from Phases 1–3 to **GDPR / HIPAA / SOC 2** areas (no new detection).
+Added to every scan result as `framework_mapping`.
+
+| Milestone | Status |
+|---|---|
+| 4.1 GDPR rule set | ✅ 9 areas (processing, lawful basis/consent, minimisation, retention, DSAR*, processors, transfers, security, ADM) |
+| 4.2 HIPAA rule set | ✅ 9 areas (PHI, access, minimum-necessary, audit, transmission, BAA, authentication, integrity, contingency) |
+| 4.3 SOC 2 rule set | ✅ 9 areas (access CC6, change CC8, ops CC7, risk CC3/9, monitoring CC4, incident CC7.3, availability A1, confidentiality C1, integrity PI1) |
+| 4.4 Table generation | ✅ per-area `{ status, severity, potential_gaps, finding_types, note }` → the "Framework / Assessed areas / Potential gaps / Status" table |
+
+Status values: **Potential gap** (a finding maps here) · **No gaps detected**
+(assessable, none found — NOT "compliant") · **Not assessed** (needs Blueprint
+policy / manual or legal review, e.g. *DSAR). Real fixture → GDPR 5 gaps/1
+not-assessed, HIPAA 4, SOC 2 5.
+
+**"Gap assessment, not a certification"** is baked into the engine as
+`FRAMEWORK_DISCLAIMER` and returned with every mapping — so the report/UI can't
+forget it. Absence of a finding never claims compliance.
+
+> **Framework content should get a legal/compliance review before shipping**
+> (an Open Question below) — the mappings are engineering-reasonable, not legal advice.
+
 ## Deferred to Phase 6 (decided & tracked — not gaps, not silent)
 
 These need a NEW Blueprint field/schema (Phase 6), so they are deliberately NOT
