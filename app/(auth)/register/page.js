@@ -12,7 +12,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const next = safeNext(useSearchParams().get('next'), '');
   const withNext = (base) => (next ? `${base}${base.includes('?') ? '&' : '?'}next=${encodeURIComponent(next)}` : base);
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: '', department: '', industry: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -61,6 +61,32 @@ export default function RegisterPage() {
             </button>
           </div>
         </Field>
+
+        {/* Minimum profile (1.1) — optional, personalises the dashboard from day one. */}
+        <div className="pt-1">
+          <p className="mb-2 text-xs text-white/40">Optional — helps us tailor your automation opportunities.</p>
+          <div className="space-y-3">
+            <AuthInput id="role" value={form.role} onChange={set('role')} placeholder="Role (e.g. Marketing Manager)" />
+            <select
+              id="department"
+              value={form.department}
+              onChange={set('department')}
+              className="w-full rounded-xl border border-[#383839] bg-[#29292B] px-3 py-3 text-sm text-white focus:border-[#4a4a4c] focus:bg-[#383839] focus:outline-none"
+            >
+              <option value="">Department (optional)</option>
+              <option value="marketing">Marketing</option>
+              <option value="sales">Sales</option>
+              <option value="finance">Finance</option>
+              <option value="support">Customer Support</option>
+              <option value="operations">Operations</option>
+              <option value="hr">People / HR</option>
+              <option value="it">IT</option>
+              <option value="product">Product</option>
+              <option value="general">Other / Cross-functional</option>
+            </select>
+            <AuthInput id="industry" value={form.industry} onChange={set('industry')} placeholder="Industry (e.g. SaaS)" />
+          </div>
+        </div>
 
         <AuthButton type="submit" loading={busy}>Create account</AuthButton>
       </form>
