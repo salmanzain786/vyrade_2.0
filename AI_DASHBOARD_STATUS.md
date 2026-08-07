@@ -29,4 +29,7 @@ users + Blueprint model — **no org/multi-tenant model** (that's Phase 2).
 (vs. estimated) hours/cost (Phase 4 telemetry).
 
 Tests: `tests/adoptionScore.test.js` (score + catalog), `tests/adoptionRepo.test.js`
-(events + opportunity map). Verified end-to-end on a real user.
+(events + opportunity map), `tests/signupProfile.test.js` (registration-time
+`seedSignupProfile` — fields→seed, partial, no-op, and the **non-fatal claim
+proven**: a seeding failure resolves, never throws). Verified end-to-end on a
+real user.
