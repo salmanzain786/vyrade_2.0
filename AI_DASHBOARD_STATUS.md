@@ -28,6 +28,39 @@ users + Blueprint model — **no org/multi-tenant model** (that's Phase 2).
 (Phase 3); org/department rollups (Phase 2 — needs the multi-tenant model); real
 (vs. estimated) hours/cost (Phase 4 telemetry).
 
+## Phase 2 — Organisational Dashboard — ✅ done
+
+The multi-tenancy layer. **Additive & non-breaking:** Blueprint ownership
+(`automation_blueprints.user_id`) is untouched — the org layer only AGGREGATES
+over members' data and gates new `/org` views by role. No existing
+ownership/permission check changed.
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 2.1 Org/department schema | ✅ | `organizations`, `departments`, `org_members`, `org_invitations` (+ Drizzle + migrate). One org per user. `membershipRepository` (create org → seeds department roster from the catalog + owner membership; add/update/remove members). |
+| 2.2 Invitations + permissions | ✅ | `invitationRepository` (tokened invite → accept adds membership; TTL 7d; revoke). Roles owner/admin/manager/member in `access.js` (pure policy): **owner/admin = whole org, manager = their department only, member = no org view**. `GET/POST/DELETE /api/org/invitations`, accept route, `PATCH/DELETE /api/org/members` (owner/admin gated). Email delivery is best-effort; the accept link is always returned to share directly. |
+| 2.3 Department comparison | ✅ | `departmentComparison` — per-member scores grouped by department (avg adoption, blueprints started/complete, implementations). |
+| 2.4 Org opportunity map | ✅ | `orgOpportunityMap` — personal maps rolled up + **deduped by area** ("N people share Lead capture"), grouped by department. `/org/opportunities`. |
+| 2.5 Platform usage | ✅ | `platformUsage` — tally of built workflow targets across the org (n8n/make/…). |
+| 2.6 Executive reporting | ✅ | `execReport` — the 5-question exec view (where using AI / where not / what's building / what's it costing / is it controlled), pulling 2.3–2.5 + real per-conversation cost + a governance rollup (no-owner / missing-approvals / sensitive-data from `governance_scans`). `/org` dashboard. |
+
+**Key design guarantee:** per-member org scores use the SAME
+`buildAdoptionSignals` + `computeAdoptionScore` as the individual dashboard
+(extracted to one source of truth), so an org rollup can never disagree with what
+a member sees. Verified on real data — a Marketing member's individual score (63)
+equals their number in the org rollup.
+
+**Scope decisions:** additive (no ownership changes); one-org-per-user; managers
+department-scoped; invite email best-effort (link always returned). Access is
+enforced server-side in every org route/page, not just hidden in the UI.
+
+**Honest note on scoring:** a fully-engaged member caps at **90**, not 100 —
+`active_workflows` (weight 0.10) stays 0 until **Phase 3** confirms deployment.
+An empty member scores **0** (no phantom skills baseline). Reachable from the app
+header (profile menu → "Organisation"). Tests: `tests/orgAccess.test.js`,
+`tests/orgRepo.test.js` (access policy, per-member scoring, dept/opportunity/
+platform aggregation, invitation guards). Verified end-to-end on a real 2-member org.
+
 Tests: `tests/adoptionScore.test.js` (score + catalog), `tests/adoptionRepo.test.js`
 (events + opportunity map), `tests/signupProfile.test.js` (registration-time
 `seedSignupProfile` — fields→seed, partial, no-op, and the **non-fatal claim

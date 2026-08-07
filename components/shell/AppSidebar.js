@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTheme } from 'next-themes';
-import { Plus, History, User, LogOut, Sun, Moon, Search, MessageSquare, Gauge } from 'lucide-react';
+import { Plus, History, User, LogOut, Sun, Moon, Search, MessageSquare, Gauge, Building2 } from 'lucide-react';
 import { cn, formatMoney } from '@/lib/utils';
 import { VyradeMark } from '@/components/VyradeLogo';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -69,6 +69,12 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
         className="flex items-center gap-2 w-full p-2 rounded-md text-sm text-foreground hover:bg-accent transition-colors"
       >
         <Gauge className="h-4 w-4" /><span>Your AI Adaptability</span>
+      </a>
+      <a
+        href="/org"
+        className="flex items-center gap-2 w-full p-2 rounded-md text-sm text-foreground hover:bg-accent transition-colors"
+      >
+        <Building2 className="h-4 w-4" /><span>Organisation</span>
       </a>
       <div className="h-px bg-border" />
       <button
