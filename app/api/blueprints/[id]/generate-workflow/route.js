@@ -12,6 +12,8 @@ import { trackServer } from '../../../../../lib/analytics/server.js';
 import { EVENTS } from '../../../../../lib/analytics/events.js';
 import { recordEvent } from '../../../../../lib/services/insights/operationalInsightsRepository.js';
 import { OPS_EVENTS, errorCategoryFromN8n, parseFailingNode } from '../../../../../lib/services/insights/operationalInsights.js';
+import { recordAdoptionEvent } from '../../../../../lib/services/adoption/adoptionRepository.js';
+import { STAGES } from '../../../../../lib/services/adoption/stages.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -116,6 +118,11 @@ export const POST = withAuth(async (user, request, { params }) => {
     blueprintId: params.id, blueprintVersion: v, userId: user.id,
     selectedPlatform: 'n8n', kind: 'workflow', recommendation,
   });
+
+  // Adoption Intelligence (1.3): building a workflow = "Architecture selected"
+  // (a recommendation was followed) → "Implementation prepared". Best-effort.
+  if (recommendation?.id) recordAdoptionEvent({ userId: user.id, stage: STAGES.ARCHITECTURE_SELECTED, blueprintId: params.id });
+  recordAdoptionEvent({ userId: user.id, stage: STAGES.IMPLEMENTATION_PREPARED, blueprintId: params.id });
 
   return NextResponse.json({
     workflow,

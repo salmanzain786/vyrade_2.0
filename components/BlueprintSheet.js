@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Copy, Download, FileCode2, Lock, Sparkles } from 'lucide-react';
+import { Loader2, Copy, Download, FileCode2, Lock, Sparkles, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import GuidedBuildModal from '@/components/GuidedBuildModal';
 import { track } from '@/lib/analytics/mixpanel';
@@ -314,6 +314,16 @@ export default function BlueprintSheet({
             <span className="font-medium">Workflow outdated.</span>{' '}
             The Blueprint changed after this workflow was generated. Regenerate to match the current Blueprint.
           </div>
+        )}
+
+        {/* Governance & Compliance — scan this automation against security,
+            privacy, framework and approved-policy checks. */}
+        {blueprintId && (
+          <Button asChild variant="outline" size="sm" className="mb-3 h-9 w-full gap-1.5 text-xs">
+            <a href={`/compliance/${blueprintId}`}>
+              <ShieldCheck className="h-3.5 w-3.5" /> Governance &amp; Compliance scan
+            </a>
+          </Button>
         )}
 
         {/* <WorkflowRouting
