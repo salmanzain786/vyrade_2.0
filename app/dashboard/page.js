@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Sparkles, Target, Gauge, ListChecks, TrendingUp, GraduationCap, ArrowRight, CheckCircle2, Home } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth/session';
 import { getAdoptionDashboard } from '@/lib/services/adoption/adoptionRepository';
+import { userExecutionSummary } from '@/lib/services/telemetry/telemetryRepository';
 import { STAGE_ORDER, STAGE_LABEL, stageIndex } from '@/lib/services/adoption/stages';
 import { DEPARTMENT_LABEL } from '@/lib/services/adoption/catalog';
 import { VyradeMark } from '@/components/VyradeLogo';
@@ -29,6 +30,7 @@ export default async function DashboardPage() {
   if (!user) redirect('/login');
 
   const d = await getAdoptionDashboard(user.id);
+  const tele = await userExecutionSummary(user.id, { days: 30 }).catch(() => ({ has_data: false }));
   const s = d.score;
   const furthest = d.stages.furthest ? stageIndex(d.stages.furthest) : -1;
 
@@ -39,6 +41,7 @@ export default async function DashboardPage() {
           <Link href="/" className="flex items-center gap-2"><VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span></Link>
           <div className="flex items-center gap-3 text-xs">
             <Link href="/" className="flex items-center gap-1 text-muted-foreground hover:text-foreground"><Home className="h-3.5 w-3.5" /> Workspace</Link>
+            <Link href="/dashboard/telemetry" className="rounded-md border border-border px-3 py-1.5 font-medium hover:bg-accent">Telemetry</Link>
             <Link href="/dashboard/profile" className="rounded-md border border-border px-3 py-1.5 font-medium hover:bg-accent">Edit profile</Link>
           </div>
         </div>
@@ -106,8 +109,23 @@ export default async function DashboardPage() {
             <div><div className="text-2xl font-bold">~{d.coverage.estimated_remaining_month}h<span className="text-sm font-normal text-muted-foreground">/mo</span></div><div className="text-xs text-muted-foreground">estimated remaining potential</div></div>
             <div><div className="text-2xl font-bold">~{d.coverage.estimated_hours_saved_month}h<span className="text-sm font-normal text-muted-foreground">/mo</span></div><div className="text-xs text-muted-foreground">estimated from addressed areas</div></div>
           </div>
-          <p className="mt-2 inline-block rounded bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-400">Estimated — based on curated benchmarks, not measured execution. Real figures arrive with execution telemetry (a later phase).</p>
+          <p className="mt-2 inline-block rounded bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+            Estimated — based on curated benchmarks, not measured execution. {tele.has_data ? <>Measured run data is now available below.</> : <>Connect <Link href="/dashboard/telemetry" className="underline">execution telemetry</Link> to replace these with measured figures.</>}
+          </p>
         </Card>
+
+        {/* 4.2/4.3 — measured execution activity (real, when telemetry is connected) */}
+        {tele.has_data && (
+          <Card title="Measured execution activity" icon={Gauge}>
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+              <div><div className="text-2xl font-bold">{tele.total}</div><div className="text-xs text-muted-foreground">runs · last {tele.window_days}d</div></div>
+              <div><div className={`text-2xl font-bold ${tele.success_rate >= 90 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>{tele.success_rate}%</div><div className="text-xs text-muted-foreground">success rate</div></div>
+              <div><div className="text-2xl font-bold">~{tele.measured_monthly_runs}</div><div className="text-xs text-muted-foreground">runs / month (measured)</div></div>
+              <div><div className="text-2xl font-bold">{tele.intervention_rate ?? 0}%</div><div className="text-xs text-muted-foreground">needed a human</div></div>
+            </div>
+            <p className="mt-2 inline-block rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400">Measured — real execution data from your connected platform.</p>
+          </Card>
+        )}
 
         {/* 1.5 Next actions */}
         {d.next_actions.length > 0 && (

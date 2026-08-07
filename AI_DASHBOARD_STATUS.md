@@ -81,6 +81,36 @@ their furthest stage from "considered" to **"measured"**. Tests:
 `tests/implementation.test.js` (confirm→events, active toggle, outcome→measured,
 input sanitisation) + the org "active lifts to 100" case.
 
+## Phase 4 — Execution Telemetry — ✅ foundation done (n8n)
+
+Converts Phase 1's ESTIMATES into MEASURED values from real platform runs. The
+spec calls this the last, most speculative phase; built as the portable
+webhook-ingestion foundation (n8n first).
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 4.1 Per-platform ingestion | ✅ (n8n) | `telemetry_tokens` + `execution_events` tables. **Token-authenticated** `POST /api/telemetry/ingest` (single event or batch, no session) → `recordExecutionEvent`. Token management API + `/dashboard/telemetry` setup page with an n8n wiring guide (HTTP Request node → ingest URL). Make/Zapier are fast-follows on the **same contract** (an HTTP action) — not separately built. |
+| 4.2 Reliability metrics | ✅ | `executionMetrics` / `userExecutionSummary` — success/failure rate, avg duration, per-category error breakdown, human-intervention rate. Rendered on the report page + dashboard. |
+| 4.3 Actual vs estimated | ✅ (volume) | **Measured monthly run volume** (extrapolated from the window) is shown next to the Phase-1 estimate; the coverage caveat flips from "estimated" to pointing at measured data. **Honest gap:** true platform *dollar* cost needs each platform's billing API (out of scope) — we surface the real *volume* that drives cost, not a fabricated $. |
+| 4.4 Time-saved measurement | ✅ (labelled) | Measured monthly runs shown against the self-reported hours-saved (Phase 3); estimate→measured labelling throughout. |
+
+**Privacy (verified):** only a validated status, duration, a COARSE error category
+(raw messages categorised then **discarded**), and an intervention flag are
+stored — never payloads/PII. A real-ingest smoke with a customer domain in the
+raw error confirmed **nothing sensitive reached storage**. Unowned `blueprint_id`s
+are dropped to null (no cross-user attribution). Tokens are shown once and only
+ever displayed masked (`abcd…wxyz`); revoke matches on the hint.
+
+**Verified end-to-end on real data:** created a token, ingested 10 runs →
+70% success / 20% failure / 1.5s avg / 1 intervention / ~10 runs/mo, errors
+categorised, no raw leakage. Tests: `tests/telemetry.test.js` (ingestion privacy +
+normalisation, reliability aggregation, token masking + hint-revoke).
+
+**Honest scope:** n8n ingestion is built and portable; Make/Zapier reuse the same
+endpoint (a documented fast-follow). Actual-dollar platform cost (4.3) needs
+per-platform billing APIs and is explicitly NOT faked — measured run *volume* is
+provided instead. This is the foundation the spec said to scope once 1–3 are live.
+
 Tests: `tests/adoptionScore.test.js` (score + catalog), `tests/adoptionRepo.test.js`
 (events + opportunity map), `tests/signupProfile.test.js` (registration-time
 `seedSignupProfile` — fields→seed, partial, no-op, and the **non-fatal claim

@@ -5,6 +5,8 @@ import { assertBlueprintOwner } from '@/lib/auth/ownership';
 import { getLatest } from '@/lib/services/blueprintRepository.js';
 import { generateBlueprintReport } from '@/lib/services/report/blueprintReport.js';
 import { getLatestScan } from '@/lib/services/scanner/scanRepository';
+import { executionMetrics } from '@/lib/services/telemetry/telemetryRepository';
+import { getImplementation } from '@/lib/services/adoption/implementationRepository';
 import { VyradeMark } from '@/components/VyradeLogo';
 import ImplementationPanel from '@/components/adoption/ImplementationPanel';
 import PrintButton from '@/components/report/PrintButton';
@@ -43,6 +45,12 @@ export default async function ReportPage({ params }) {
     blueprint: record.blueprint, blueprintId: params.id, blueprintVersion: record.version,
   });
   const s = report.sections;
+
+  // Phase 4 — execution telemetry (measured) + implementation (self-reported).
+  const [telemetry, impl] = await Promise.all([
+    executionMetrics(params.id, { days: 30 }).catch(() => ({ has_data: false })),
+    getImplementation(params.id).catch(() => null),
+  ]);
 
   // Phase 8.1 — governance status per Blueprint, from the latest persisted scan.
   const gov = await getLatestScan(params.id).catch(() => null);
@@ -114,6 +122,36 @@ export default async function ReportPage({ params }) {
 
         {/* Implementation tracking (Phase 3) */}
         <ImplementationPanel blueprintId={params.id} />
+
+        {/* Execution telemetry (Phase 4) — measured reliability, or a prompt to connect */}
+        <div className="mb-8 rounded-lg border border-border bg-card p-4 print:hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Execution telemetry</span>
+            {telemetry.has_data
+              ? <span className="rounded-full border border-emerald-500/30 bg-emerald-500/5 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">Measured · last {telemetry.window_days}d</span>
+              : <Link href="/dashboard/telemetry" className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">Connect platform →</Link>}
+          </div>
+          {telemetry.has_data ? (
+            <>
+              <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3">
+                <div><div className="text-xl font-bold">{telemetry.total}</div><div className="text-[11px] text-muted-foreground">runs</div></div>
+                <div><div className={`text-xl font-bold ${telemetry.success_rate >= 90 ? 'text-emerald-600 dark:text-emerald-400' : telemetry.success_rate >= 70 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>{telemetry.success_rate}%</div><div className="text-[11px] text-muted-foreground">success rate</div></div>
+                <div><div className="text-xl font-bold">{telemetry.avg_duration_ms == null ? '—' : `${(telemetry.avg_duration_ms / 1000).toFixed(1)}s`}</div><div className="text-[11px] text-muted-foreground">avg duration</div></div>
+                <div><div className="text-xl font-bold">{telemetry.intervention_rate ?? 0}%</div><div className="text-[11px] text-muted-foreground">human intervention</div></div>
+                <div><div className="text-xl font-bold">~{telemetry.measured_monthly_runs}</div><div className="text-[11px] text-muted-foreground">runs / month (measured)</div></div>
+              </div>
+              {/* 4.4 — measured vs estimated hours saved */}
+              {impl?.time_saved_hours != null && (
+                <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-400">Measured hours saved: ~{impl.time_saved_hours}h/mo (self-reported), against ~{telemetry.measured_monthly_runs} confirmed runs/month.</p>
+              )}
+              {telemetry.by_error.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">{telemetry.by_error.map((e) => <span key={e.category} className="rounded border border-red-500/20 px-1.5 py-0.5 text-[10px] text-red-600 dark:text-red-400">{e.category}: {e.count}</span>)}</div>
+              )}
+            </>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">No execution data yet. Connect your platform to replace estimated activity with measured success rates, execution time and real run volume.</p>
+          )}
+        </div>
 
         {/* 1. Business problem */}
         <Section n="1" title="Business problem">
