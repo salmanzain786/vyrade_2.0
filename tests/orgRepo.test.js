@@ -11,13 +11,14 @@ vi.mock('../lib/services/org/membershipRepository.js', async (orig) => ({
 const { perMemberScores, departmentComparison, orgOpportunityMap, platformUsage } = await import('../lib/services/org/orgRepository.js');
 const { createInvitation } = await import('../lib/services/org/invitationRepository.js');
 
-// bp, wf, gov, opp, prof — the fixed query order inside perMemberScores.
-const signalMocks = () => query
+// bp, wf, gov, opp, prof, impl — the fixed query order inside perMemberScores.
+const signalMocks = (activeRows = []) => query
   .mockResolvedValueOnce([[{ user_id: 'a', started: 3, completed: 3 }]])
   .mockResolvedValueOnce([[{ user_id: 'a', prepared: 2 }]])
   .mockResolvedValueOnce([[{ user_id: 'a', avg: 100 }]])
   .mockResolvedValueOnce([[{ user_id: 'a', total: 5, engaged: 5 }]])
-  .mockResolvedValueOnce([[{ user_id: 'a', technical_skill: 'developer' }]]);
+  .mockResolvedValueOnce([[{ user_id: 'a', technical_skill: 'developer' }]])
+  .mockResolvedValueOnce([activeRows]);
 
 describe('org aggregation (2.3–2.5)', () => {
   beforeEach(() => { query.mockReset(); listMembers.mockReset(); });
@@ -31,6 +32,14 @@ describe('org aggregation (2.3–2.5)', () => {
     const rows = await perMemberScores('org1', 'marketing');
     expect(rows.find((r) => r.user_id === 'a').score).toBe(90); // fully engaged (90 ceiling until active workflows confirmed)
     expect(rows.find((r) => r.user_id === 'b').score).toBe(0);   // no activity
+  });
+
+  it('a confirmed-active implementation (Phase 3) lifts the member to 100', async () => {
+    listMembers.mockResolvedValue([{ user_id: 'a', email: 'a@x', name: 'A', role: 'member', department: 'marketing' }]);
+    signalMocks([{ user_id: 'a', active: 1 }]); // one active implementation
+    const rows = await perMemberScores('org1');
+    expect(rows.find((r) => r.user_id === 'a').score).toBe(100);
+    expect(rows.find((r) => r.user_id === 'a').active).toBe(1);
   });
 
   it('departmentComparison groups + averages by department', async () => {

@@ -54,12 +54,32 @@ equals their number in the org rollup.
 department-scoped; invite email best-effort (link always returned). Access is
 enforced server-side in every org route/page, not just hidden in the UI.
 
-**Honest note on scoring:** a fully-engaged member caps at **90**, not 100 —
-`active_workflows` (weight 0.10) stays 0 until **Phase 3** confirms deployment.
-An empty member scores **0** (no phantom skills baseline). Reachable from the app
-header (profile menu → "Organisation"). Tests: `tests/orgAccess.test.js`,
-`tests/orgRepo.test.js` (access policy, per-member scoring, dept/opportunity/
-platform aggregation, invitation guards). Verified end-to-end on a real 2-member org.
+**Honest note on scoring:** an empty member scores **0** (no phantom skills
+baseline). Before Phase 3 a fully-engaged member capped at 90; **Phase 3 now
+lifts that to 100** by feeding `active_workflows` real confirmations. Reachable
+from the app header (profile menu → "Organisation"). Tests: `tests/orgAccess.test.js`,
+`tests/orgRepo.test.js`. Verified end-to-end on a real 2-member org.
+
+## Phase 3 — Implementation Tracking — ✅ done
+
+Turns Implemented / Active / Measured from INFERENCE into CONFIRMED fact —
+closing the "estimated activity vs. real adoption" credibility gap. Plugs into
+Phase 1's progression events.
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 3.1 Confirm implemented | ✅ | `blueprint_implementations` table + `confirmImplemented` (platform, deployment date, owner). Deploying implies active. |
+| 3.2 Active/inactive | ✅ | `setActive` toggle, independent of implemented (a workflow can be turned off later). |
+| 3.3 Manual outcome reporting | ✅ | `reportOutcome` (usage volume, hours saved, notes) → sets "Measured". **Explicitly labelled self-reported** in the UI until Phase 4 telemetry. |
+| 3.4 Wire into taxonomy + score | ✅ | Confirmations fire the real `implemented` / `active` / `measured` progression events, and the **`active_workflows` score signal now reads confirmed-active implementations** — for both the individual dashboard and the org per-member/department rollup. |
+
+UI: `ImplementationPanel` on the Blueprint report page (`/report/[id]`) — confirm,
+toggle active, report outcomes. API: `GET/POST/PATCH/PUT /api/blueprints/[id]/implementation`
+(ownership-gated). **Verified on real data:** confirming an implementation raised
+a user's score **67 → 77** (exactly the +10 active-workflows weight) and advanced
+their furthest stage from "considered" to **"measured"**. Tests:
+`tests/implementation.test.js` (confirm→events, active toggle, outcome→measured,
+input sanitisation) + the org "active lifts to 100" case.
 
 Tests: `tests/adoptionScore.test.js` (score + catalog), `tests/adoptionRepo.test.js`
 (events + opportunity map), `tests/signupProfile.test.js` (registration-time

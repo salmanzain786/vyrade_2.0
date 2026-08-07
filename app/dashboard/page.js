@@ -96,7 +96,7 @@ export default async function DashboardPage() {
               );
             })}
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">The last three stages (Implemented → Active → Measured) are confirmed in Implementation Tracking (a later phase), not inferred.</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">The last three stages (Implemented → Active → Measured) advance only when you confirm a workflow is deployed and report outcomes on its report page — real confirmations, not inference.</p>
         </Card>
 
         {/* 1.6 Coverage — labelled estimated */}

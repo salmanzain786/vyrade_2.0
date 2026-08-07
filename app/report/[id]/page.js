@@ -6,6 +6,7 @@ import { getLatest } from '@/lib/services/blueprintRepository.js';
 import { generateBlueprintReport } from '@/lib/services/report/blueprintReport.js';
 import { getLatestScan } from '@/lib/services/scanner/scanRepository';
 import { VyradeMark } from '@/components/VyradeLogo';
+import ImplementationPanel from '@/components/adoption/ImplementationPanel';
 import PrintButton from '@/components/report/PrintButton';
 import { cn, formatMoney } from '@/lib/utils';
 
@@ -110,6 +111,9 @@ export default async function ReportPage({ params }) {
             <p className="mt-2 text-xs text-muted-foreground">This automation hasn’t been scanned for governance &amp; compliance yet.</p>
           )}
         </div>
+
+        {/* Implementation tracking (Phase 3) */}
+        <ImplementationPanel blueprintId={params.id} />
 
         {/* 1. Business problem */}
         <Section n="1" title="Business problem">
