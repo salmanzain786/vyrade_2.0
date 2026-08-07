@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Sparkles, Target, Gauge, ListChecks, TrendingUp, GraduationCap, ArrowRight, CheckCircle2, Home } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth/session';
 import { getAdoptionDashboard } from '@/lib/services/adoption/adoptionRepository';
-import { userExecutionSummary } from '@/lib/services/telemetry/telemetryRepository';
+import { userExecutionSummary, measuredHoursSavedForUser } from '@/lib/services/telemetry/telemetryRepository';
 import { STAGE_ORDER, STAGE_LABEL, stageIndex } from '@/lib/services/adoption/stages';
 import { DEPARTMENT_LABEL } from '@/lib/services/adoption/catalog';
 import { VyradeMark } from '@/components/VyradeLogo';
@@ -30,7 +30,10 @@ export default async function DashboardPage() {
   if (!user) redirect('/login');
 
   const d = await getAdoptionDashboard(user.id);
-  const tele = await userExecutionSummary(user.id, { days: 30 }).catch(() => ({ has_data: false }));
+  const [tele, measuredHours] = await Promise.all([
+    userExecutionSummary(user.id, { days: 30 }).catch(() => ({ has_data: false })),
+    measuredHoursSavedForUser(user.id, { days: 30 }).catch(() => ({ has_measured: false })),
+  ]);
   const s = d.score;
   const furthest = d.stages.furthest ? stageIndex(d.stages.furthest) : -1;
 
@@ -108,9 +111,16 @@ export default async function DashboardPage() {
             <div><div className="text-2xl font-bold">{d.coverage.label}</div><div className="text-xs text-muted-foreground">opportunities addressed</div></div>
             <div><div className="text-2xl font-bold">~{d.coverage.estimated_remaining_month}h<span className="text-sm font-normal text-muted-foreground">/mo</span></div><div className="text-xs text-muted-foreground">estimated remaining potential</div></div>
             <div><div className="text-2xl font-bold">~{d.coverage.estimated_hours_saved_month}h<span className="text-sm font-normal text-muted-foreground">/mo</span></div><div className="text-xs text-muted-foreground">estimated from addressed areas</div></div>
+            {measuredHours.has_measured && (
+              <div><div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">~{measuredHours.hours_month}h<span className="text-sm font-normal text-muted-foreground">/mo</span></div><div className="text-xs text-muted-foreground">measured hours saved</div></div>
+            )}
           </div>
           <p className="mt-2 inline-block rounded bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-400">
-            Estimated — based on curated benchmarks, not measured execution. {tele.has_data ? <>Measured run data is now available below.</> : <>Connect <Link href="/dashboard/telemetry" className="underline">execution telemetry</Link> to replace these with measured figures.</>}
+            Estimated — based on curated benchmarks, not measured execution. {measuredHours.has_measured
+              ? <>A <span className="text-emerald-700 dark:text-emerald-400">measured</span> hours-saved figure (rate × real run volume) is shown for {measuredHours.blueprints} automation{measuredHours.blueprints === 1 ? '' : 's'}.</>
+              : tele.has_data
+                ? <>Run data is measured below, but hours-saved stays self-reported until you set “minutes saved / run” on a Blueprint’s report.</>
+                : <>Connect <Link href="/dashboard/telemetry" className="underline">execution telemetry</Link> and set a per-run rate to replace these with measured figures.</>}
           </p>
         </Card>
 

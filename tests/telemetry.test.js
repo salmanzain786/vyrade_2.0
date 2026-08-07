@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const query = vi.fn();
 vi.mock('../lib/config/db.js', () => ({ pool: { query: (...a) => query(...a) } }));
-const { recordExecutionEvent, executionMetrics, resolveToken, revokeToken, listTokens } = await import('../lib/services/telemetry/telemetryRepository.js');
+const { recordExecutionEvent, executionMetrics, resolveToken, revokeToken, listTokens, measuredHoursSavedForUser, measuredHoursForBlueprint } = await import('../lib/services/telemetry/telemetryRepository.js');
 
 describe('telemetry ingestion (4.1) — privacy + normalisation', () => {
   beforeEach(() => query.mockReset());
@@ -65,6 +65,36 @@ describe('reliability metrics (4.2/4.3)', () => {
     const m = await executionMetrics('bp1', {});
     expect(m.has_data).toBe(false);
     expect(m.success_rate).toBeNull();
+  });
+});
+
+describe('4.4 — telemetry-derived hours saved (rate × measured volume)', () => {
+  beforeEach(() => query.mockReset());
+
+  it('measuredHoursForBlueprint = rate × measured runs / 60', () => {
+    expect(measuredHoursForBlueprint({ minutesPerRun: 6, measuredMonthlyRuns: 300 })).toBe(30); // 6min × 300 / 60
+    expect(measuredHoursForBlueprint({ minutesPerRun: null, measuredMonthlyRuns: 300 })).toBeNull();
+    expect(measuredHoursForBlueprint({ minutesPerRun: 6, measuredMonthlyRuns: 0 })).toBeNull();
+  });
+
+  it('measuredHoursSavedForUser sums real volume × rate, extrapolated to a month', async () => {
+    // Two automations: 70 runs/7d @ 6min (→300/mo → 30h) and 30 runs/7d @ 10min (→~128.5/mo → ~21h)
+    query.mockResolvedValueOnce([[
+      { blueprint_id: 'b1', minutes_saved_per_run: 6, runs: 70 },
+      { blueprint_id: 'b2', minutes_saved_per_run: 10, runs: 30 },
+    ]]);
+    const m = await measuredHoursSavedForUser('u1', { days: 7 });
+    expect(m.has_measured).toBe(true);
+    expect(m.blueprints).toBe(2);
+    // 300/mo×6/60=30 ; (30*30/7)=128.57/mo×10/60=21.43 → round total 51
+    expect(m.hours_month).toBe(51);
+  });
+
+  it('ignores automations with a rate but zero measured runs (no phantom hours)', async () => {
+    query.mockResolvedValueOnce([[{ blueprint_id: 'b1', minutes_saved_per_run: 6, runs: 0 }]]);
+    const m = await measuredHoursSavedForUser('u1', { days: 30 });
+    expect(m.has_measured).toBe(false);
+    expect(m.hours_month).toBe(0);
   });
 });
 

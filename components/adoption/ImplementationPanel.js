@@ -15,6 +15,7 @@ export default function ImplementationPanel({ blueprintId }) {
   const [owner, setOwner] = useState('');
   const [usage, setUsage] = useState('');
   const [saved, setSaved] = useState('');
+  const [perRun, setPerRun] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -26,6 +27,7 @@ export default function ImplementationPanel({ blueprintId }) {
         setOwner(j.implementation.owner || '');
         setUsage(j.implementation.usage_volume ?? '');
         setSaved(j.implementation.time_saved_hours ?? '');
+        setPerRun(j.implementation.minutes_saved_per_run ?? '');
         setNotes(j.implementation.outcome_notes || '');
       }
     }).catch(() => setImpl(null));
@@ -81,10 +83,11 @@ export default function ImplementationPanel({ blueprintId }) {
             <div className="flex flex-wrap items-end gap-2">
               <label className="flex flex-col text-xs text-muted-foreground">Runs / month<input type="number" min="0" value={usage} onChange={(e) => setUsage(e.target.value)} className={`mt-1 w-28 ${input}`} /></label>
               <label className="flex flex-col text-xs text-muted-foreground">Hours saved / month<input type="number" min="0" value={saved} onChange={(e) => setSaved(e.target.value)} className={`mt-1 w-32 ${input}`} /></label>
+              <label className="flex flex-col text-xs text-muted-foreground" title="With telemetry connected, this rate × measured run volume gives a real hours-saved figure.">Minutes saved / run<input type="number" min="0" value={perRun} onChange={(e) => setPerRun(e.target.value)} className={`mt-1 w-32 ${input}`} /></label>
               <label className="flex flex-1 flex-col text-xs text-muted-foreground">Notes<input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="what's working / not" className={`mt-1 ${input}`} /></label>
-              <button disabled={busy} onClick={() => call('PUT', { usage_volume: usage === '' ? null : Number(usage), time_saved_hours: saved === '' ? null : Number(saved), notes: notes || null })} className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent">Save outcomes</button>
+              <button disabled={busy} onClick={() => call('PUT', { usage_volume: usage === '' ? null : Number(usage), time_saved_hours: saved === '' ? null : Number(saved), minutes_saved_per_run: perRun === '' ? null : Number(perRun), notes: notes || null })} className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent">Save outcomes</button>
             </div>
-            <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-400">Self-reported — real execution metrics arrive with telemetry (a later phase).</p>
+            <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-400">Runs/hours are self-reported. Set <strong>minutes saved / run</strong> and connect telemetry to get a <em>measured</em> hours-saved figure (rate × real run volume).</p>
           </div>
         </div>
       )}

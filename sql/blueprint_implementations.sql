@@ -22,3 +22,9 @@ CREATE TABLE IF NOT EXISTS blueprint_implementations (
   INDEX idx_impl_user (user_id),
   INDEX idx_impl_active (active)
 ) ENGINE=InnoDB;
+
+-- Phase 4.4 — a per-run time-saved rate. Multiplied by MEASURED run volume
+-- (execution_events) it yields a genuinely telemetry-derived hours-saved figure
+-- that replaces the Phase-1 estimate once telemetry is connected. Tolerant
+-- migration ignores the duplicate-column error on re-run.
+ALTER TABLE blueprint_implementations ADD COLUMN minutes_saved_per_run INT NULL;

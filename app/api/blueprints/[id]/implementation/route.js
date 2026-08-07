@@ -32,6 +32,6 @@ export const PATCH = withAuth(async (user, request, { params }) => {
 export const PUT = withAuth(async (user, request, { params }) => {
   await assertBlueprintOwner(user, params.id);
   const b = await request.json().catch(() => ({}));
-  const impl = await reportOutcome({ blueprintId: params.id, userId: user.id, usageVolume: b.usage_volume, timeSavedHours: b.time_saved_hours, notes: b.notes });
+  const impl = await reportOutcome({ blueprintId: params.id, userId: user.id, usageVolume: b.usage_volume, timeSavedHours: b.time_saved_hours, notes: b.notes, minutesSavedPerRun: b.minutes_saved_per_run });
   return NextResponse.json({ implementation: impl });
 });

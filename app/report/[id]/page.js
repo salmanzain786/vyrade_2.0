@@ -140,10 +140,14 @@ export default async function ReportPage({ params }) {
                 <div><div className="text-xl font-bold">{telemetry.intervention_rate ?? 0}%</div><div className="text-[11px] text-muted-foreground">human intervention</div></div>
                 <div><div className="text-xl font-bold">~{telemetry.measured_monthly_runs}</div><div className="text-[11px] text-muted-foreground">runs / month (measured)</div></div>
               </div>
-              {/* 4.4 — measured vs estimated hours saved */}
-              {impl?.time_saved_hours != null && (
-                <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-400">Measured hours saved: ~{impl.time_saved_hours}h/mo (self-reported), against ~{telemetry.measured_monthly_runs} confirmed runs/month.</p>
-              )}
+              {/* 4.4 — genuinely telemetry-derived hours saved (rate × measured runs) */}
+              {impl?.minutes_saved_per_run ? (
+                <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-400">
+                  <strong>Measured hours saved: ~{Math.round((telemetry.measured_monthly_runs * impl.minutes_saved_per_run) / 60)}h/mo</strong> — {impl.minutes_saved_per_run} min/run × ~{telemetry.measured_monthly_runs} measured runs/month (telemetry-derived).
+                </p>
+              ) : impl?.time_saved_hours != null ? (
+                <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400">Hours saved is still self-reported (~{impl.time_saved_hours}h/mo). Set <em>minutes saved / run</em> above to derive a measured figure from your ~{telemetry.measured_monthly_runs} confirmed runs/month.</p>
+              ) : null}
               {telemetry.by_error.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">{telemetry.by_error.map((e) => <span key={e.category} className="rounded border border-red-500/20 px-1.5 py-0.5 text-[10px] text-red-600 dark:text-red-400">{e.category}: {e.count}</span>)}</div>
               )}
