@@ -85,7 +85,12 @@ export default function OpportunityMap({ initialOpportunities, projects, showAna
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {o.status === 'reviewing' && o.discovery_id ? (
+                  {o.status === 'blueprint_created' && o.blueprint_id ? (
+                    <>
+                      <a href={`/report/${o.blueprint_id}`} className="rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-accent">Blueprint</a>
+                      <a href={`/compliance/${o.blueprint_id}`} className="rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-accent">Assurance</a>
+                    </>
+                  ) : o.status === 'reviewing' && o.discovery_id ? (
                     <a href={`/work/discovery/${o.discovery_id}`} className="rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-accent">Continue discovery →</a>
                   ) : o.status === 'accepted' ? (
                     <button onClick={() => toBlueprint(o.id)} disabled={busy} className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60"><Wand2 className="h-3.5 w-3.5" />Create Blueprint</button>

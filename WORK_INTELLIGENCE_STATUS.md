@@ -135,3 +135,23 @@ with a fake token, proving it got past the gate). Tests: `tests/writeback.test.j
 (lifecycle derivation across all stages, permission gating on/off, idempotency,
 not-linked). Full suite 618. Live write-back needs a real ClickUp token; the gate,
 lifecycle projection, linking and comment payload are all built + tested.
+
+## Phase 5 — Deeper Feature Integration — ✅ done
+
+Weaves task data into Vyrade's existing features — reuse/wiring, not new logic.
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 5.1 Cost Intelligence enrichment | ✅ | `costSignals.js#taskCostSignals` derives frequency, assignees, process steps, est. manual time, **manual-review steps**, avg cycle time, related-task count from the originating task — surfaced on the report as a **"Task-derived cost inputs"** panel, **clearly labelled Estimated**. |
+| 5.2 Contextual retrieval enrichment | ✅ (careful) | Systems/apps a task mentions are detected from EXISTING task text and fed into the discovery context + narrative, so the generated Blueprint's `systems` (which retrieval already keys on) reflect real tool usage. **Deliberately additive** — it improves what retrieval sees via the Blueprint, without touching live Pinecone retrieval code, which the plan flags needs real evaluation. That deeper change is documented as deferred. |
+| 5.3 Automation Assurance linkage | ✅ | A new **entry point** into the already-built 8-phase scanner — not new scanning logic. Task-sourced Blueprints reach `/compliance/[id]` from the report, and the Opportunity Map now surfaces **"Blueprint" + "Assurance"** links on completed opportunities. |
+| 5.4 AI Operations funnel | ✅ | `funnel.js#workFunnel` aggregates the full task→outcome funnel (tasks analysed → opportunities → accepted → Blueprints started → complete → implementations prepared → deployed → measured) from the Phase 2–4 tables — every stage is **real persisted state, not inferred**. `/admin/work-intelligence` renders it as a conversion funnel, reusing admin dashboard patterns + a "Work funnel" sidebar item. |
+
+Verified on the real DB (funnel query executes over the live tables). Tests:
+`tests/workPhase5.test.js` (funnel aggregation + conversion, cost-signal
+derivation incl. review-step + cycle-time + not-linked, systems detection).
+Full suite 625.
+
+**This completes Phases 1–5 — the full single-platform Work Intelligence product.**
+Deferred by plan: Phase 6 (more platforms — same connector pattern) and Phase 7
+(auto-create draft Blueprint — behind explicit org opt-in).

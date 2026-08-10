@@ -8,6 +8,7 @@ import { getLatestScan } from '@/lib/services/scanner/scanRepository';
 import { executionMetrics } from '@/lib/services/telemetry/telemetryRepository';
 import { getImplementation } from '@/lib/services/adoption/implementationRepository';
 import { getLink } from '@/lib/services/work-intelligence/writeback/taskLinkRepository';
+import { taskCostSignals } from '@/lib/services/work-intelligence/costSignals';
 import { VyradeMark } from '@/components/VyradeLogo';
 import ImplementationPanel from '@/components/adoption/ImplementationPanel';
 import WriteBackPanel from '@/components/work-intelligence/WriteBackPanel';
@@ -49,10 +50,11 @@ export default async function ReportPage({ params }) {
   const s = report.sections;
 
   // Phase 4 — execution telemetry (measured) + implementation (self-reported).
-  const [telemetry, impl, taskLink] = await Promise.all([
+  const [telemetry, impl, taskLink, costSignals] = await Promise.all([
     executionMetrics(params.id, { days: 30 }).catch(() => ({ has_data: false })),
     getImplementation(params.id).catch(() => null),
     getLink(params.id).catch(() => null), // Work Intelligence write-back link
+    taskCostSignals(params.id).catch(() => null), // 5.1 task-derived cost inputs
   ]);
 
   // Phase 8.1 — governance status per Blueprint, from the latest persisted scan.
@@ -125,6 +127,26 @@ export default async function ReportPage({ params }) {
 
         {/* Work Intelligence write-back (Phase 4) — only for task-sourced Blueprints */}
         {taskLink?.external_task_id && <WriteBackPanel blueprintId={params.id} link={taskLink} />}
+
+        {/* Task-derived cost inputs (Phase 5.1) — estimates from the originating task */}
+        {costSignals && (
+          <div className="mb-8 rounded-lg border border-border bg-card p-4 print:hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Task-derived cost inputs</span>
+              <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">Estimated</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+              <div><span className="font-medium">{costSignals.frequency_label}</span><div className="text-[11px] text-muted-foreground">frequency</div></div>
+              <div><span className="font-medium">{costSignals.assignees}</span><div className="text-[11px] text-muted-foreground">assignees</div></div>
+              <div><span className="font-medium">{costSignals.process_steps}</span><div className="text-[11px] text-muted-foreground">process steps</div></div>
+              {costSignals.estimated_manual_minutes != null && <div><span className="font-medium">~{costSignals.estimated_manual_minutes}m</span><div className="text-[11px] text-muted-foreground">est. manual time/run</div></div>}
+              <div><span className="font-medium">{costSignals.manual_review_steps}</span><div className="text-[11px] text-muted-foreground">manual-review steps</div></div>
+              {costSignals.average_cycle_days != null && <div><span className="font-medium">{costSignals.average_cycle_days}d</span><div className="text-[11px] text-muted-foreground">avg cycle time</div></div>}
+              {costSignals.related_task_count > 0 && <div><span className="font-medium">{costSignals.related_task_count}</span><div className="text-[11px] text-muted-foreground">related tasks</div></div>}
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">Derived from the originating task to ground the cost estimate — estimates until confirmed.</p>
+          </div>
+        )}
 
         {/* Implementation tracking (Phase 3) */}
         <ImplementationPanel blueprintId={params.id} />
