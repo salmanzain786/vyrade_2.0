@@ -14,6 +14,7 @@ const { hashRef } = await import('../lib/services/work-intelligence/sanitizer.js
 // the connection_optouts branch. Returns proper mysql2 [rows|packet, fields] shapes.
 const dbMock = (optRows = []) => query.mockImplementation(async (sql) => {
   if (/FROM connection_optouts/i.test(sql)) return [optRows];
+  if (/SELECT external_id, status, status_history FROM ingested_tasks/i.test(sql)) return [[]]; // status-history pre-load: no prior rows
   return [{ affectedRows: 0 }]; // ingest INSERTs + retention DELETE
 });
 

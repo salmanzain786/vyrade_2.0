@@ -72,6 +72,35 @@ describe('sensitive-data handling (1.5)', () => {
   });
 });
 
+describe('fuller context capture (2.2) — opt-in only', () => {
+  const rawWithExtras = {
+    id: 't9', name: 'Client onboarding', status: { status: 'open' },
+    comments: [{ comment_text: 'ping the client at bob@acme.com', date: '1700000000000' }],
+    attachments: [{ title: 'contract.pdf', url: 'https://files.example.com/c.pdf' }],
+    linked_tasks: [{ task_id: 'rel1' }], dependencies: [{ task_id: 'rel2' }],
+  };
+
+  it('normalizes comments, attachments, and related task ids from the payload', () => {
+    const t = normalizeTask('clickup', rawWithExtras);
+    expect(t.comments[0].text).toMatch(/ping the client/);
+    expect(t.attachments[0]).toEqual({ name: 'contract.pdf', url: 'https://files.example.com/c.pdf' });
+    expect(t.related_ids.sort()).toEqual(['rel1', 'rel2']);
+  });
+
+  it('stores comments/attachments ONLY when the field is opted in — default OFF keeps them out', () => {
+    const t = normalizeTask('clickup', rawWithExtras);
+    const off = sanitizeTaskForStorage(t, { redact_emails: true });                 // fields not opted in
+    expect(off.comments).toEqual([]);
+    expect(off.attachments).toEqual([]);
+    const on = sanitizeTaskForStorage(t, { redact_emails: true, __include_comments: true, __include_attachments: true });
+    expect(on.comments).toHaveLength(1);
+    expect(on.comments[0].text).toContain('[REDACTED_EMAIL]');                       // comment text redacted
+    expect(on.comments[0].text).not.toMatch(/bob@acme/);
+    expect(on.attachments[0].name).toBe('contract.pdf');
+    expect(on.related_ids.sort()).toEqual(['rel1', 'rel2']);                          // ids always safe
+  });
+});
+
 describe('scope config (1.3) — reads nothing by default', () => {
   it('defaults are conservative: no projects, no write-back, comments/attachments off', () => {
     const s = normalizeScope({});

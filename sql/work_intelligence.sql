@@ -61,6 +61,16 @@ CREATE TABLE IF NOT EXISTS ingested_tasks (
   INDEX idx_task_retention (retention_expires_at)
 ) ENGINE=InnoDB;
 
+-- Phase 2.2 fuller context — captured ONLY when the org opts the field in
+-- (scope.fields.comments / .attachments), so the conservative default footprint
+-- is unchanged. Comments are redacted like all other text; attachments store
+-- metadata/links only (never content). status_history accumulates observed
+-- transitions across syncs. Tolerant migration ignores duplicate-column errors.
+ALTER TABLE ingested_tasks ADD COLUMN comments JSON NULL;
+ALTER TABLE ingested_tasks ADD COLUMN attachments JSON NULL;
+ALTER TABLE ingested_tasks ADD COLUMN related_ids JSON NULL;
+ALTER TABLE ingested_tasks ADD COLUMN status_history JSON NULL;
+
 -- Employees who have opted out of having their tasks analysed (governance 1.4).
 CREATE TABLE IF NOT EXISTS connection_optouts (
   connection_id  CHAR(36)     NOT NULL,

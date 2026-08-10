@@ -25,6 +25,26 @@ describe('task context + signal detection (2.2)', () => {
     expect(s).toMatch(/Task: Monthly SEO reporting/);
     expect(s).toMatch(/Detected signals/);
   });
+
+  it('includes the fuller context (2.2): comments, attachments, related, status history + their signals', () => {
+    const richTask = {
+      ...seoTask, external_id: 'r1',
+      comments: JSON.stringify([{ text: 'client asked us to redo the summary', at: null }]),
+      attachments: JSON.stringify([{ name: 'template.xlsx', url: null }]),
+      related_ids: JSON.stringify(['dep1']),
+      status_history: JSON.stringify([{ to: 'open' }, { from: 'open', to: 'review' }, { from: 'review', to: 'open' }]),
+    };
+    const ctx = buildTaskContext(richTask);
+    expect(ctx.comments).toHaveLength(1);
+    expect(ctx.attachments[0].name).toBe('template.xlsx');
+    expect(ctx.related_ids).toEqual(['dep1']);
+    const keys = ctx.signals.map((s) => s.key);
+    expect(keys).toContain('rework');       // 3 status transitions
+    expect(keys).toContain('linked_work');  // related_ids present
+    const summary = contextSummary(ctx);
+    expect(summary).toMatch(/Recent discussion/);
+    expect(summary).toMatch(/Status history: open → review → open/);
+  });
 });
 
 describe('clarification engine (2.3) — deterministic fallback', () => {
