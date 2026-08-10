@@ -79,4 +79,35 @@ LLM call, gated behind the user's "Generate draft Blueprint" action).
 UI: `/work/tasks` (picker), `/work/discovery/[id]` (clarification flow →
 "Generate draft Blueprint" → `/report/[id]`). Reachable from the connection page.
 Tests: `tests/taskDiscovery.test.js` (signal detection, clarification fallback +
-priority ordering, narrative embeds answers & marks blanks uncertain). Full suite 588.
+priority ordering, narrative embeds answers & marks blanks uncertain),
+`tests/discoveryGenerate.test.js` (generation-reuse wiring, mocked). Full suite 593.
+
+## Phase 3 — Organisation-wide Opportunity Discovery — ✅ done
+
+Mode 2: detect recurring-work patterns across authorized task metadata → named
+opportunities → manager review → Blueprint (via Phase 2 discovery).
+
+**DECISION (plan's open question — reuse `opportunity_map` or not?):** a
+**separate `work_opportunities` table**. The adoption `opportunity_map` is
+per-user, keyed by a curated catalog area; task-sourced opportunities are a
+different grain — org-level PATTERNS across many tasks/employees, carrying task
+EVIDENCE. Forcing them together would corrupt both. We keep the shared
+opportunity VOCABULARY (status lifecycle) but not one table. Documented in the SQL.
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 3.1 Pattern detection engine | ✅ | `patterns/detect.js` — **rules-based, explainable** (start-deterministic): repeated names, recurring, **copied-across-projects**, consistent-checklist (structural fingerprint), approval-bottleneck, reopened/rework, multi-person handoff. Name normalization canonicalizes dates/months/numbers so periodic tasks group. Every finding carries **evidence** (task ids/projects) and people are counted via **hashed** refs only. |
+| 3.2 Opportunity Map | ✅ | `patterns/opportunities.js` names findings like the spec ("Monthly report across 14 projects", "Lead cleanup repeated by 6 people") + directional est-hours (labelled). Persisted in `work_opportunities`; **upsert refreshes counts but never resets a human-set status**. `/work/opportunities`. |
+| 3.3 Manager review flow | ✅ | Opportunities land as `suggested` — **nothing auto-approved**. Confirm / dismiss; a confirmed one → "Create Blueprint" starts a **Phase 2 discovery** on a representative task (human still refines before generation). Status lifecycle suggested → accepted → reviewing (in discovery) → blueprint_created. `PUT /api/work/opportunities/[id]`. |
+| 3.4 Analyse modes | ✅ | "**Analyse recurring work**" (all authorized tasks) and "**Analyse a project**" (one project) as distinct entry points. `POST /api/work/analyze { mode, project }`. |
+
+**Verified on the real DB:** 6 tasks → 4 opportunities (`copied_across_projects`
+"Monthly report across 3 projects", `consistent_checklist`, `recurring`,
+`repeated_name`) matching the spec's examples; and re-running analysis **preserved
+an accepted opportunity's status** (review isn't clobbered). Tests:
+`tests/workPatterns.test.js` (normalization, each signal, one-off-ignored,
+naming/estimation, upsert-preserves-status). Full suite 602.
+
+**Org/manager scoping:** opportunities store `org_id`; `listOrgOpportunities`
+supports an admin/manager view. Per the plan, deeper department-scoped review maps
+onto the existing org model — foundation in place, richer scoping is a follow-on.

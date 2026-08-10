@@ -19,6 +19,7 @@ export default async function WorkTasksPage() {
         <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
           <Link href="/" className="flex items-center gap-2"><VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span></Link>
           <div className="flex items-center gap-3 text-xs">
+            <Link href="/work/opportunities" className="rounded-md border border-border px-3 py-1.5 font-medium hover:bg-accent">Opportunity Map</Link>
             <Link href="/integrations/task-management" className="text-muted-foreground hover:text-foreground">Connections</Link>
             <Link href="/" className="flex items-center gap-1 text-muted-foreground hover:text-foreground"><Home className="h-3.5 w-3.5" /> Workspace</Link>
           </div>
