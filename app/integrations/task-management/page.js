@@ -57,7 +57,13 @@ export default async function TaskManagementPage({ searchParams }) {
             <p className="mt-4 flex items-start gap-2 text-[11px] text-muted-foreground"><ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600 dark:text-blue-400" /> After connecting you choose exactly which projects and fields Vyrade may read, whether it can write back, how long task content is retained, and who can see identified opportunities. Nothing is analysed until you set scope.</p>
           </section>
         ) : (
-          <ConnectionSetup platform={PILOT} connection={connection} />
+          <>
+            <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-sm">
+              <span className="text-blue-700 dark:text-blue-400">Tasks synced? Explore them for automation.</span>
+              <Link href="/work/tasks" className="font-medium text-blue-600 hover:underline dark:text-blue-400">Browse your tasks →</Link>
+            </div>
+            <ConnectionSetup platform={PILOT} connection={connection} />
+          </>
         )}
       </main>
     </div>

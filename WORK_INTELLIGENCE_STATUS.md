@@ -55,3 +55,28 @@ NOT stored) → 2 ingested → L2 excluded from fetch → secret + email redacte
 through the pipeline. Tests: `tests/workIntelligenceSync.test.js` (5 e2e cases:
 scope filter, opt-out exclusion, reads-nothing-when-unscoped, read-disabled,
 field-scope drop). Full suite 582.
+
+## Phase 2 — Employee-Initiated Automation Discovery — ✅ done
+
+Mode 1: one task → focused clarification → a real draft Blueprint (via the
+EXISTING generation engine, not a parallel one).
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 2.1 "Explore Automation With Vyrade" | ✅ | Task browser at `/work/tasks` (lists ingested tasks) + `ExploreButton` → starts a discovery session. `POST /api/work/discovery`. |
+| 2.2 Context retrieval & normalization | ✅ | `discovery/context.js#buildTaskContext` reads the already-redacted ingested task into a structured context + **rules-based signal detection** (recurring / multiple-sources / drafting / approval / external-delivery / handoff) — matching the spec's SEO example. |
+| 2.3 Process-discovery clarification | ✅ | `discovery/clarification.js` — LLM-driven (`client.chat.completions`, JSON mode) with a **deterministic curated fallback** (the spec's questions, signal-gated), so it works and is testable without an API key. Never blocks on an LLM hiccup. |
+| 2.4 Draft Blueprint from task + answers | ✅ | `discovery/narrative.js` builds a process brief from task + answers; `discovery/generate.js` feeds it to **`createInitialBlueprint` (the existing engine)** — no parallel generator. Unanswered questions are marked **explicitly uncertain**, never guessed. Session linked to the Blueprint. |
+| 2.5 Architecture + cost wiring | ✅ (inherent) | Because the draft is a NORMAL Blueprint (created via the standard path), the platform-recommendation and cost engines run over it unchanged, and it appears in the report/compliance/adoption surfaces. Zero new logic. |
+
+**Verified on the real DB:** the spec's "Monthly SEO reporting" task → signals
+`recurring, multiple_sources, drafting, approval, external_delivery` → 9 focused
+questions → a narrative that embeds the answers and flags blanks as
+uncertain/needs-clarification → session persisted and reloaded. The final
+generation step reuses the existing, already-tested Blueprint engine (a billed
+LLM call, gated behind the user's "Generate draft Blueprint" action).
+
+UI: `/work/tasks` (picker), `/work/discovery/[id]` (clarification flow →
+"Generate draft Blueprint" → `/report/[id]`). Reachable from the connection page.
+Tests: `tests/taskDiscovery.test.js` (signal detection, clarification fallback +
+priority ordering, narrative embeds answers & marks blanks uncertain). Full suite 588.
