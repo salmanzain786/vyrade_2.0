@@ -96,17 +96,24 @@ opportunity VOCABULARY (status lifecycle) but not one table. Documented in the S
 
 | Milestone | Status | Notes |
 |---|---|---|
-| 3.1 Pattern detection engine | ✅ | `patterns/detect.js` — **rules-based, explainable** (start-deterministic): repeated names, recurring, **copied-across-projects**, consistent-checklist (structural fingerprint), approval-bottleneck, reopened/rework, multi-person handoff. Name normalization canonicalizes dates/months/numbers so periodic tasks group. Every finding carries **evidence** (task ids/projects) and people are counted via **hashed** refs only. |
+| 3.1 Pattern detection engine | ✅ **all 11 signals** | `patterns/detect.js` — **rules-based, explainable** (start-deterministic). Covers the spec's full list: (1) repeated names, (2) recurring, (3) **repeated subtasks** (child tasks by parent), (4) multi-person handoff, (5) copied-across-projects, (6) **long-running/overdue** (duration outliers from ingested dates), (7) **status churn** (frequent changes), (8) consistent-checklist (structural fingerprint), (9) **common-tool usage** (text heuristic over existing task text), (10) approval bottleneck, (11) reopened/rework (genuine back-transition). Name normalization canonicalizes dates/months/numbers; every finding carries **evidence** (task ids/projects); people counted via **hashed** refs only. |
 | 3.2 Opportunity Map | ✅ | `patterns/opportunities.js` names findings like the spec ("Monthly report across 14 projects", "Lead cleanup repeated by 6 people") + directional est-hours (labelled). Persisted in `work_opportunities`; **upsert refreshes counts but never resets a human-set status**. `/work/opportunities`. |
-| 3.3 Manager review flow | ✅ | Opportunities land as `suggested` — **nothing auto-approved**. Confirm / dismiss; a confirmed one → "Create Blueprint" starts a **Phase 2 discovery** on a representative task (human still refines before generation). Status lifecycle suggested → accepted → reviewing (in discovery) → blueprint_created. `PUT /api/work/opportunities/[id]`. |
+| 3.3 Manager review flow | ✅ | Opportunities land as `suggested` — **nothing auto-approved**. Confirm / dismiss; a confirmed one → "Create Blueprint" starts a **Phase 2 discovery** on a representative task (human still refines before generation). Status lifecycle suggested → accepted → reviewing → blueprint_created. **Real manager review (client-review fix):** a `/work/opportunities/team` page (managers+) lists the whole team's opportunities via `listOrgOpportunities` (with creator shown), and `canActOnOpportunity` lets an owner/admin/**manager of the same org** confirm/dismiss a team member's opportunity — not just the creator. Reuses the org access model (`canReviewOpportunities`). Verified on the real DB: an owner acts on a member's opportunity; an unrelated user is denied. |
 | 3.4 Analyse modes | ✅ | "**Analyse recurring work**" (all authorized tasks) and "**Analyse a project**" (one project) as distinct entry points. `POST /api/work/analyze { mode, project }`. |
 
 **Verified on the real DB:** 6 tasks → 4 opportunities (`copied_across_projects`
 "Monthly report across 3 projects", `consistent_checklist`, `recurring`,
 `repeated_name`) matching the spec's examples; and re-running analysis **preserved
 an accepted opportunity's status** (review isn't clobbered). Tests:
-`tests/workPatterns.test.js` (normalization, each signal, one-off-ignored,
-naming/estimation, upsert-preserves-status). Full suite 602.
+`tests/workPatterns.test.js` (normalization, all 11 signals incl. the 4 added
+after the client's audit — repeated-subtask, long-duration with injected clock,
+status-churn-distinct-from-reopened, common-tool — one-off-ignored,
+naming/estimation, upsert-preserves-status). Full suite 606.
+
+**Signal coverage note:** the initial ship covered 7–8 of the spec's 11 signals;
+after the client's precise audit, the remaining ones were added — all using data
+ALREADY ingested (dates, parent_id, status_history, task text), so no new capture
+was needed, including a rules-based text heuristic for common-tool usage (#9).
 
 **Org/manager scoping:** opportunities store `org_id`; `listOrgOpportunities`
 supports an admin/manager view. Per the plan, deeper department-scoped review maps

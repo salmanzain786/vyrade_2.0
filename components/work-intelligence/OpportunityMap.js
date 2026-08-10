@@ -7,6 +7,7 @@ import { RefreshCw, Check, X, Wand2, FolderSearch, Repeat } from 'lucide-react';
 const SIGNAL_LABEL = {
   repeated_name: 'Repeated task', recurring: 'Recurring', copied_across_projects: 'Copied across projects',
   consistent_checklist: 'Consistent checklist', approval_bottleneck: 'Approval bottleneck', reopened: 'Reopened/rework', handoff: 'Multi-person handoff',
+  repeated_subtask: 'Repeated subtask', long_duration: 'Long-running/overdue', status_churn: 'Status churn', common_tool: 'Common tool usage',
 };
 const STATUS_TONE = {
   suggested: 'border-border text-muted-foreground', reviewing: 'border-blue-500/30 text-blue-600 dark:text-blue-400',
@@ -14,7 +15,7 @@ const STATUS_TONE = {
   dismissed: 'border-border text-muted-foreground line-through',
 };
 
-export default function OpportunityMap({ initialOpportunities, projects }) {
+export default function OpportunityMap({ initialOpportunities, projects, showAnalyze = true }) {
   const router = useRouter();
   const [opps, setOpps] = useState(initialOpportunities || []);
   const [busy, setBusy] = useState(false);
@@ -49,7 +50,8 @@ export default function OpportunityMap({ initialOpportunities, projects }) {
 
   return (
     <div className="space-y-5">
-      {/* 3.4 — the two analysis modes */}
+      {/* 3.4 — the two analysis modes (hidden in the manager/team view) */}
+      {showAnalyze && (
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4">
         <button onClick={() => analyze('recurring')} disabled={busy} className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"><Repeat className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />Analyse recurring work</button>
         <div className="flex items-end gap-2">
@@ -63,6 +65,7 @@ export default function OpportunityMap({ initialOpportunities, projects }) {
         </div>
         {note && <span className="text-xs text-muted-foreground">{note}</span>}
       </div>
+      )}
 
       {opps.length === 0 ? (
         <p className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">No opportunities yet. Run an analysis above — Vyrade looks for recurring names, repeated checklists, copied-across-projects work, approval bottlenecks and rework.</p>
@@ -78,6 +81,7 @@ export default function OpportunityMap({ initialOpportunities, projects }) {
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {SIGNAL_LABEL[o.signal] || o.signal} · {o.task_count} tasks{o.project_count > 1 ? ` · ${o.project_count} projects` : ''}{o.people_count > 1 ? ` · ${o.people_count} people` : ''} · ~{o.est_hours_month}h/mo <span className="text-[10px]">(est)</span>
+                    {o.creator_email ? <span className="ml-1">· found for <span className="text-foreground">{o.creator_name || o.creator_email}</span></span> : null}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">

@@ -5,6 +5,8 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { listOpportunities } from '@/lib/services/work-intelligence/patterns/opportunityRepository';
 import { listProjects } from '@/lib/services/work-intelligence/ingestedTaskRepository';
 import { getActiveConnection } from '@/lib/services/work-intelligence/connectionRepository';
+import { getMembership } from '@/lib/services/org/membershipRepository';
+import { canReviewOpportunities } from '@/lib/services/org/access';
 import { VyradeMark } from '@/components/VyradeLogo';
 import OpportunityMap from '@/components/work-intelligence/OpportunityMap';
 
@@ -14,10 +16,12 @@ export default async function OpportunitiesPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
   const conn = await getActiveConnection(user.id, 'clickup').catch(() => null);
-  const [opportunities, projects] = await Promise.all([
+  const [opportunities, projects, membership] = await Promise.all([
     listOpportunities(user.id).catch(() => []),
     listProjects(user.id, { connectionId: conn?.id }).catch(() => []),
+    getMembership(user.id).catch(() => null),
   ]);
+  const isManager = membership && canReviewOpportunities(membership.role);
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,6 +29,7 @@ export default async function OpportunitiesPage() {
         <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
           <Link href="/" className="flex items-center gap-2"><VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span></Link>
           <div className="flex items-center gap-3 text-xs">
+            {isManager && <Link href="/work/opportunities/team" className="rounded-md border border-border px-3 py-1.5 font-medium hover:bg-accent">Team opportunities</Link>}
             <Link href="/work/tasks" className="flex items-center gap-1 text-muted-foreground hover:text-foreground"><ListTodo className="h-3.5 w-3.5" /> Tasks</Link>
             <Link href="/" className="flex items-center gap-1 text-muted-foreground hover:text-foreground"><Home className="h-3.5 w-3.5" /> Workspace</Link>
           </div>

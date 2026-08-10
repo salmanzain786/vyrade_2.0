@@ -50,6 +50,42 @@ describe('pattern detection (3.1)', () => {
   it('ignores one-off tasks (below the group threshold) — no noise', () => {
     expect(detectPatterns([task({ name: 'Unique thing' }), task({ name: 'Another one' })])).toEqual([]);
   });
+
+  // The four signals added after the client's 11-signal audit.
+  it('#3 detects repeated SUBTASKS (child tasks with a parent)', () => {
+    const subs = [1, 2, 3].map((i) => task({ name: 'Collect documents', parent_id: `parent${i}` }));
+    expect(detectPatterns(subs).map((x) => x.signal)).toContain('repeated_subtask');
+  });
+
+  it('#6 detects long-running / overdue tasks (uses a fixed clock)', () => {
+    const now = Date.parse('2026-06-01T00:00:00Z');
+    const old = { task_created_at: '2026-01-01T00:00:00Z' }; // ~5 months old, still open
+    const overdue = { due_date: '2026-05-01T00:00:00Z', task_created_at: '2026-05-20T00:00:00Z' };
+    const tasks = [task({ name: 'Long A', ...old }), task({ name: 'Long B', ...old }), task({ name: 'Overdue C', ...overdue })];
+    const f = detectPatterns(tasks, { now });
+    const dur = f.find((x) => x.signal === 'long_duration');
+    expect(dur).toBeTruthy();
+    expect(dur.task_count).toBe(3);
+    // a DONE old task is excluded
+    expect(detectPatterns([task({ status: 'closed', ...old }), task({ status: 'closed', ...old }), task({ status: 'closed', ...old })], { now }).some((x) => x.signal === 'long_duration')).toBe(false);
+  });
+
+  it('#7 status_churn is distinct from #11 reopened (churn = volume, reopened = back-transition)', () => {
+    const churn = [1, 2, 3].map(() => task({ name: 'a', status_history: JSON.stringify([{ to: 's1' }, { to: 's2' }, { to: 's3' }, { to: 's4' }]) })); // 4 forward
+    const back = [1, 2, 3].map(() => task({ name: 'b', status_history: JSON.stringify([{ to: 'open' }, { to: 'review' }, { to: 'open' }]) })); // back-transition
+    const churnSigs = detectPatterns(churn).map((x) => x.signal);
+    expect(churnSigs).toContain('status_churn');
+    expect(churnSigs).not.toContain('reopened');   // no back-transition
+    expect(detectPatterns(back).map((x) => x.signal)).toContain('reopened');
+  });
+
+  it('#9 detects common-tool usage across tasks (text heuristic)', () => {
+    const tasks = [1, 2, 3].map((i) => task({ name: `Update ${i}`, description: 'sync data into Salesforce' }));
+    const f = detectPatterns(tasks);
+    const tool = f.find((x) => x.signal === 'common_tool');
+    expect(tool).toBeTruthy();
+    expect(tool.pattern_key).toBe('tool:salesforce');
+  });
 });
 
 describe('opportunity naming (3.2)', () => {
@@ -73,7 +109,7 @@ describe('opportunity naming (3.2)', () => {
 // Repo: upsert preserves a human-set status.
 const query = vi.fn();
 vi.mock('../lib/config/db.js', () => ({ pool: { query: (...a) => query(...a) } }));
-const { setStatus, upsertOpportunities } = await import('../lib/services/work-intelligence/patterns/opportunityRepository.js');
+const { setStatus, upsertOpportunities, canActOnOpportunity } = await import('../lib/services/work-intelligence/patterns/opportunityRepository.js');
 
 describe('opportunity repository (3.3)', () => {
   beforeEach(() => query.mockReset());
@@ -85,7 +121,29 @@ describe('opportunity repository (3.3)', () => {
     expect(sql).not.toMatch(/status=VALUES\(status\)/i); // status preserved
   });
   it('rejects an invalid status', async () => {
-    query.mockResolvedValueOnce([[{ id: 'o1', user_id: 'u1', status: 'suggested', evidence: '{}' }]]);
-    await expect(setStatus('o1', 'u1', 'bogus')).rejects.toThrow(/Invalid/);
+    await expect(setStatus('o1', 'bogus')).rejects.toThrow(/Invalid/);
+  });
+});
+
+describe('manager review authorization (3.3) — who can confirm/dismiss', () => {
+  beforeEach(() => query.mockReset());
+  const member = (role, orgId = 'org1') => query.mockResolvedValueOnce([[{ org_id: orgId, role, department: null, org_name: 'Acme', owner_user_id: 'x' }]]);
+
+  it('the CREATOR can always act — even with no org (no DB hit)', async () => {
+    expect(await canActOnOpportunity({ user_id: 'u1', org_id: null }, 'u1')).toBe(true);
+    expect(query).not.toHaveBeenCalled();
+  });
+  it('a non-creator with no org on the opportunity cannot act', async () => {
+    expect(await canActOnOpportunity({ user_id: 'u1', org_id: null }, 'u2')).toBe(false);
+  });
+  it('an owner/admin/manager of the SAME org CAN act on a team member’s opportunity', async () => {
+    member('manager'); expect(await canActOnOpportunity({ user_id: 'u1', org_id: 'org1' }, 'mgr')).toBe(true);
+    member('admin');   expect(await canActOnOpportunity({ user_id: 'u1', org_id: 'org1' }, 'adm')).toBe(true);
+  });
+  it('a plain MEMBER cannot act on someone else’s opportunity', async () => {
+    member('member'); expect(await canActOnOpportunity({ user_id: 'u1', org_id: 'org1' }, 'mem')).toBe(false);
+  });
+  it('a manager of a DIFFERENT org cannot act', async () => {
+    member('admin', 'org2'); expect(await canActOnOpportunity({ user_id: 'u1', org_id: 'org1' }, 'mgr')).toBe(false);
   });
 });
