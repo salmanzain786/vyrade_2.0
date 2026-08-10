@@ -144,13 +144,14 @@ Weaves task data into Vyrade's existing features — reuse/wiring, not new logic
 |---|---|---|
 | 5.1 Cost Intelligence enrichment | ✅ | `costSignals.js#taskCostSignals` derives frequency, assignees, process steps, est. manual time, **manual-review steps**, avg cycle time, related-task count from the originating task — surfaced on the report as a **"Task-derived cost inputs"** panel, **clearly labelled Estimated**. |
 | 5.2 Contextual retrieval enrichment | ✅ (careful) | Systems/apps a task mentions are detected from EXISTING task text and fed into the discovery context + narrative, so the generated Blueprint's `systems` (which retrieval already keys on) reflect real tool usage. **Deliberately additive** — it improves what retrieval sees via the Blueprint, without touching live Pinecone retrieval code, which the plan flags needs real evaluation. That deeper change is documented as deferred. |
-| 5.3 Automation Assurance linkage | ✅ | A new **entry point** into the already-built 8-phase scanner — not new scanning logic. Task-sourced Blueprints reach `/compliance/[id]` from the report, and the Opportunity Map now surfaces **"Blueprint" + "Assurance"** links on completed opportunities. |
+| 5.3 Automation Assurance linkage | ✅ (task-aware, client-review fix) | Initially this was just the generic compliance link that exists for ALL Blueprints — the audit correctly caught that nothing was task-aware. Now built: `getTaskOrigin(blueprintId)` resolves the originating task (platform + redacted name + URL); the **compliance report shows an "Assurance for an automation from a ClickUp task: <name>" banner with a link back to the task** when the Blueprint is task-sourced (null → generic Blueprints unchanged); the discovery view has a dedicated **"Run assurance check"** action; and the Opportunity Map surfaces a per-Blueprint Assurance link. A new entry point into the existing scanner — no new scanning logic. |
 | 5.4 AI Operations funnel | ✅ | `funnel.js#workFunnel` aggregates the full task→outcome funnel (tasks analysed → opportunities → accepted → Blueprints started → complete → implementations prepared → deployed → measured) from the Phase 2–4 tables — every stage is **real persisted state, not inferred**. `/admin/work-intelligence` renders it as a conversion funnel, reusing admin dashboard patterns + a "Work funnel" sidebar item. |
 
-Verified on the real DB (funnel query executes over the live tables). Tests:
-`tests/workPhase5.test.js` (funnel aggregation + conversion, cost-signal
-derivation incl. review-step + cycle-time + not-linked, systems detection).
-Full suite 625.
+Verified on the real DB (funnel query + `getTaskOrigin` execute over the live
+tables). Tests: `tests/workPhase5.test.js` (funnel aggregation + conversion,
+cost-signal derivation incl. review-step + cycle-time + not-linked, systems
+detection, **and 5.3 task-origin resolution incl. discovery fallback + null for
+non-task Blueprints**). Full suite 628.
 
 **This completes Phases 1–5 — the full single-platform Work Intelligence product.**
 Deferred by plan: Phase 6 (more platforms — same connector pattern) and Phase 7

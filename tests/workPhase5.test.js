@@ -5,6 +5,7 @@ const query = vi.fn();
 vi.mock('../lib/config/db.js', () => ({ pool: { query: (...a) => query(...a) } }));
 const { workFunnel } = await import('../lib/services/work-intelligence/funnel.js');
 const { taskCostSignals } = await import('../lib/services/work-intelligence/costSignals.js');
+const { getTaskOrigin } = await import('../lib/services/work-intelligence/writeback/taskLinkRepository.js');
 
 describe('work funnel (5.4)', () => {
   beforeEach(() => query.mockReset());
@@ -56,6 +57,28 @@ describe('task-derived cost inputs (5.1)', () => {
   it('returns null when the Blueprint is not task-linked', async () => {
     query.mockResolvedValueOnce([[]]); // getLink → no link
     expect(await taskCostSignals('bp1')).toBeNull();
+  });
+});
+
+describe('Automation Assurance linkage — task-aware (5.3)', () => {
+  beforeEach(() => query.mockReset());
+  it('resolves the originating task (name + link) for a task-sourced Blueprint', async () => {
+    query
+      .mockResolvedValueOnce([[{ blueprint_id: 'bp1', connection_id: 'c1', external_task_id: 'T1', task_url: 'https://app.clickup.com/t/T1', platform: 'clickup' }]]) // getLink
+      .mockResolvedValueOnce([[{ name: 'Monthly SEO reporting' }]]); // ingested_tasks name
+    const o = await getTaskOrigin('bp1');
+    expect(o).toMatchObject({ platform: 'clickup', external_task_id: 'T1', task_url: 'https://app.clickup.com/t/T1', task_name: 'Monthly SEO reporting' });
+  });
+  it('falls back to the discovery session task name when the task has aged out', async () => {
+    query
+      .mockResolvedValueOnce([[{ blueprint_id: 'bp1', connection_id: 'c1', external_task_id: 'T1', platform: 'clickup' }]]) // getLink
+      .mockResolvedValueOnce([[]])                                    // ingested_tasks gone (retention)
+      .mockResolvedValueOnce([[{ task_name: 'Client onboarding' }]]); // discovery fallback
+    expect((await getTaskOrigin('bp1')).task_name).toBe('Client onboarding');
+  });
+  it('returns null for a Blueprint NOT born from a task (generic Blueprints stay generic)', async () => {
+    query.mockResolvedValueOnce([[]]); // no link
+    expect(await getTaskOrigin('bp1')).toBeNull();
   });
 });
 

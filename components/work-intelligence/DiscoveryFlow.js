@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Wand2, ArrowRight } from 'lucide-react';
+import { Save, Wand2, ArrowRight, ShieldCheck } from 'lucide-react';
 
 // Clarification + draft-Blueprint flow (Phase 2.3/2.4). Collects answers to the
 // generated questions; unanswered ones are explicitly marked uncertain in the
@@ -37,8 +37,11 @@ export default function DiscoveryFlow({ sessionId, initial }) {
   if (initial.blueprint_id) {
     return (
       <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 text-sm">
-        A draft Blueprint has been created from this task.
-        <a href={`/report/${initial.blueprint_id}`} className="ml-2 inline-flex items-center gap-1 font-medium text-blue-600 hover:underline dark:text-blue-400">Open the report <ArrowRight className="h-4 w-4" /></a>
+        <div>A draft Blueprint has been created from this task.</div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a href={`/report/${initial.blueprint_id}`} className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">Open the report <ArrowRight className="h-4 w-4" /></a>
+          <a href={`/compliance/${initial.blueprint_id}`} className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent"><ShieldCheck className="h-3.5 w-3.5" /> Run assurance check</a>
+        </div>
       </div>
     );
   }

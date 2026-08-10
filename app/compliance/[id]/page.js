@@ -1,9 +1,10 @@
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldCheck, AlertTriangle, FileWarning, ClipboardList, Eye, History, ArrowUp, ArrowDown, Minus, GitCompareArrows, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, FileWarning, ClipboardList, Eye, History, ArrowUp, ArrowDown, Minus, GitCompareArrows, CheckCircle2, XCircle, RotateCcw, ListTodo, ExternalLink } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth/session';
 import { assertBlueprintOwner } from '@/lib/auth/ownership';
 import { getScanContextForBlueprint, getLatestScan, getScanHistory, saveScan, getLastTwoScans, getResolutions } from '@/lib/services/scanner/scanRepository';
+import { getTaskOrigin } from '@/lib/services/work-intelligence/writeback/taskLinkRepository';
 import { scanContext } from '@/lib/services/scanner/scan';
 import { diffScans, detectRegressions, findingKey } from '@/lib/services/scanner/reassessment';
 import { VyradeMark } from '@/components/VyradeLogo';
@@ -69,6 +70,9 @@ export default async function CompliancePage({ params }) {
   const regressions = detectRegressions(latest.findings || [], resolutions);
   const regressionKeys = new Set(regressions.map(findingKey));
 
+  // Phase 5.3 — make the Assurance report task-aware: acknowledge the originating task.
+  const taskOrigin = await getTaskOrigin(params.id).catch(() => null);
+
   const scan = { workflow_name: latest.workflow_name, node_count: latest.node_count, summary: latest.summary || {} };
   const r = latest.report;
   const o = r.overall;
@@ -118,6 +122,14 @@ export default async function CompliancePage({ params }) {
           </div>
           <p className="text-xs text-muted-foreground">Last scanned {fmtDate(latest.created_at)}</p>
         </div>
+
+        {/* Phase 5.3 — originating task (Automation Assurance is task-aware) */}
+        {taskOrigin && (
+          <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-xs">
+            <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400"><ListTodo className="h-3.5 w-3.5" /> Assurance for an automation from a {taskOrigin.platform || 'task-platform'} task{taskOrigin.task_name ? <>: <span className="font-medium">{taskOrigin.task_name}</span></> : ''}.</span>
+            {taskOrigin.task_url && <a href={taskOrigin.task_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-blue-600 hover:underline dark:text-blue-400">Open task <ExternalLink className="h-3.5 w-3.5" /></a>}
+          </div>
+        )}
 
         {/* Disclaimers — first-class, per the spec */}
         <div className="mt-4 space-y-2">
