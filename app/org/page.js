@@ -119,18 +119,10 @@ export default async function OrgDashboard() {
 
 function Shell({ orgName, scopeNote, children }) {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
-          <Link href="/" className="flex items-center gap-2"><VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span></Link>
-          <Link href="/" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><Home className="h-3.5 w-3.5" /> Workspace</Link>
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-5 py-8">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Building2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />{orgName}</h1>
-        {scopeNote && <p className="mt-1 text-sm text-muted-foreground">Executive overview · {scopeNote}</p>}
-        <div className="mt-6">{children}</div>
-      </main>
-    </div>
+    <main className="mx-auto max-w-6xl px-5 py-8">
+      <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Building2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />{orgName}</h1>
+      {scopeNote && <p className="mt-1 text-sm text-muted-foreground">Executive overview · {scopeNote}</p>}
+      <div className="mt-6">{children}</div>
+    </main>
   );
 }

@@ -38,19 +38,7 @@ export default async function DashboardPage() {
   const furthest = d.stages.furthest ? stageIndex(d.stages.furthest) : -1;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
-          <Link href="/" className="flex items-center gap-2"><VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span></Link>
-          <div className="flex items-center gap-3 text-xs">
-            <Link href="/" className="flex items-center gap-1 text-muted-foreground hover:text-foreground"><Home className="h-3.5 w-3.5" /> Workspace</Link>
-            <Link href="/dashboard/telemetry" className="rounded-md border border-border px-3 py-1.5 font-medium hover:bg-accent">Telemetry</Link>
-            <Link href="/dashboard/profile" className="rounded-md border border-border px-3 py-1.5 font-medium hover:bg-accent">Edit profile</Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-5 py-8">
+    <main className="mx-auto max-w-5xl px-5 py-8">
         <h1 className="text-2xl font-semibold tracking-tight">Your AI Adaptability</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {d.profile?.role ? `${d.profile.role}${d.profile.department ? ` · ${DEPARTMENT_LABEL[d.profile.department] || d.profile.department}` : ''}` : 'A personalised view of your automation adoption.'}
@@ -183,7 +171,6 @@ export default async function DashboardPage() {
             <div className="mt-2 flex flex-wrap gap-1">{d.skills.engaged_complexity.map((c) => <span key={c} className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{(c || '').replace('_', '-')}</span>)}</div>
           )}
         </Card>
-      </main>
-    </div>
+    </main>
   );
 }

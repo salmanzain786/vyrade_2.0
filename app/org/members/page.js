@@ -26,14 +26,7 @@ export default async function MembersPage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
-          <Link href="/org" className="flex items-center gap-2"><VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span></Link>
-          <Link href="/org" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Overview</Link>
-        </div>
-      </header>
-      <main className="mx-auto max-w-4xl px-5 py-8">
+    <main className="mx-auto max-w-4xl px-5 py-8">
         <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
         <p className="mt-1 text-sm text-muted-foreground">{access.org_name} · {members.length} member{members.length === 1 ? '' : 's'}{access.scope === 'department' ? ` · ${DEPARTMENT_LABEL[access.departmentFilter] || access.departmentFilter}` : ''}</p>
 
@@ -72,7 +65,6 @@ export default async function MembersPage() {
             </ul>
           </>
         )}
-      </main>
-    </div>
+    </main>
   );
 }

@@ -18,14 +18,7 @@ export default async function OrgOpportunitiesPage() {
   const { by_department, total_instances } = await orgOpportunityMap(access.org_id, access.departmentFilter);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
-          <Link href="/org" className="flex items-center gap-2"><VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span></Link>
-          <Link href="/org" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Overview</Link>
-        </div>
-      </header>
-      <main className="mx-auto max-w-4xl px-5 py-8">
+    <main className="mx-auto max-w-4xl px-5 py-8">
         <h1 className="text-2xl font-semibold tracking-tight">Organisation opportunity map</h1>
         <p className="mt-1 text-sm text-muted-foreground">Personal opportunity maps rolled up and de-duplicated across the team · {total_instances} total across members.</p>
 
@@ -52,7 +45,6 @@ export default async function OrgOpportunitiesPage() {
             </div>
           </section>
         ))}
-      </main>
-    </div>
+    </main>
   );
 }
