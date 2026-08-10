@@ -24,7 +24,7 @@ export default function WriteBackPanel({ blueprintId, link }) {
         <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Link2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />Originating task</span>
         {taskUrl && <a href={taskUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">Open task <ExternalLink className="h-3.5 w-3.5" /></a>}
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">This Blueprint originated from a {link?.platform || 'task-platform'} task. Sync its lifecycle stage back to that task so the team sees progress where they work.</p>
+      <p className="mt-1 text-xs text-muted-foreground">This Blueprint originated from a {link?.platform || 'task-platform'} task. Progress syncs automatically as it advances (after generation, scanning, deployment); use this to sync on demand.</p>
 
       <div className="mt-3 flex items-center gap-3">
         <button onClick={sync} disabled={busy} className="inline-flex items-center gap-1.5 rounded-md border border-blue-600/40 bg-blue-600/10 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-600/20 disabled:opacity-60 dark:text-blue-400">

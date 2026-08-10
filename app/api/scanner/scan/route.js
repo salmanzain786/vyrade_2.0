@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth/guard';
 import { assertBlueprintOwner } from '@/lib/auth/ownership';
 import { scanWorkflow, scanContext, SUPPORTED_PLATFORMS } from '@/lib/services/scanner/scan';
 import { getScanContextForBlueprint, saveScan, getLatestScan } from '@/lib/services/scanner/scanRepository';
+import { autoSyncProgress } from '@/lib/services/work-intelligence/writeback/sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,8 @@ export const POST = withAuth(async (user, request) => {
       const previous = await getLatestScan(body.blueprintId).catch(() => null);
       const result = scanContext(ctx);
       const scanId = await saveScan({ blueprintId: body.blueprintId, userId: user.id, ctx, result });
+      // Work Intelligence (4.2): a governance scan now exists → advance the task's lifecycle.
+      autoSyncProgress({ blueprintId: body.blueprintId, userId: user.id, appOrigin: new URL(request.url).origin });
       const prev = previous && { readiness_pct: previous.readiness_pct, security_risk_level: previous.security_risk_level, findings_total: previous.findings_total, scanned_at: previous.created_at };
       return NextResponse.json({
         ...result,

@@ -30,7 +30,7 @@ vi.mock('../lib/services/work-intelligence/connectionRepository.js', () => ({ ge
 const postComment = vi.fn(async () => ({ id: 'c1', url: 'https://app.clickup.com/t/T1' }));
 vi.mock('../lib/services/work-intelligence/connectors/registry.js', () => ({ getConnector: () => ({ platform: 'clickup', supportsWriteback: true, postComment: (...a) => postComment(...a) }) }));
 
-const { syncBlueprintProgress } = await import('../lib/services/work-intelligence/writeback/sync.js');
+const { syncBlueprintProgress, autoSyncProgress } = await import('../lib/services/work-intelligence/writeback/sync.js');
 
 // State-gather queries fire in fixed order: link, then (blueprint status, wf, gov, impl), then recordSync.
 const linkRow = (over = {}) => [[{ blueprint_id: 'bp1', connection_id: 'c1', external_task_id: 'T1', last_stage: null, ...over }]];
@@ -77,5 +77,21 @@ describe('write-back permission gating (4.1)', () => {
     query.mockResolvedValueOnce([[]]); // no link
     const r = await syncBlueprintProgress({ userId: 'u1', blueprintId: 'bp1' });
     expect(r).toMatchObject({ ok: false, reason: 'not_task_linked' });
+  });
+});
+
+describe('autoSyncProgress (auto-trigger at state-change events, 4.2)', () => {
+  beforeEach(() => query.mockReset());
+  it('no-ops without ids and never throws synchronously', () => {
+    expect(() => autoSyncProgress({})).not.toThrow();
+    expect(() => autoSyncProgress({ blueprintId: 'bp1' })).not.toThrow(); // missing userId
+    expect(query).not.toHaveBeenCalled();
+  });
+  it('is fire-and-forget best-effort — returns void and no-ops for an unlinked Blueprint', async () => {
+    query.mockResolvedValue([[]]); // getLink → null (not task-linked)
+    getConnection.mockResolvedValue(undefined);
+    expect(autoSyncProgress({ blueprintId: 'bp1', userId: 'u1' })).toBeUndefined(); // detached, returns nothing
+    await new Promise((r) => setTimeout(r, 5)); // let the detached promise settle
+    expect(postComment).not.toHaveBeenCalled(); // no write for an unlinked Blueprint
   });
 });

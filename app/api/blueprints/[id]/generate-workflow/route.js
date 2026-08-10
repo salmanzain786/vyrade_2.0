@@ -14,6 +14,7 @@ import { recordEvent } from '../../../../../lib/services/insights/operationalIns
 import { OPS_EVENTS, errorCategoryFromN8n, parseFailingNode } from '../../../../../lib/services/insights/operationalInsights.js';
 import { recordAdoptionEvent } from '../../../../../lib/services/adoption/adoptionRepository.js';
 import { STAGES } from '../../../../../lib/services/adoption/stages.js';
+import { autoSyncProgress } from '../../../../../lib/services/work-intelligence/writeback/sync.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,6 +124,10 @@ export const POST = withAuth(async (user, request, { params }) => {
   // (a recommendation was followed) → "Implementation prepared". Best-effort.
   if (recommendation?.id) recordAdoptionEvent({ userId: user.id, stage: STAGES.ARCHITECTURE_SELECTED, blueprintId: params.id });
   recordAdoptionEvent({ userId: user.id, stage: STAGES.IMPLEMENTATION_PREPARED, blueprintId: params.id });
+
+  // Work Intelligence (4.2): a workflow now exists → push the advanced lifecycle
+  // stage to the originating task (no-ops unless task-linked + write-back on).
+  autoSyncProgress({ blueprintId: params.id, userId: user.id, appOrigin: new URL(request.url).origin });
 
   return NextResponse.json({
     workflow,
