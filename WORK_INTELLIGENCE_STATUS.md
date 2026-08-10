@@ -33,3 +33,25 @@ Tests: `tests/workIntelligence.test.js` (token crypto round-trip, ClickUp
 normalization, redaction/hashing, scope+governance defaults), `tests/connectionRepo.test.js`
 (tokens encrypted at rest, never leaked to client). 14 tests; ingest verified
 end-to-end on the real DB (no sensitive-data leakage, retention stamped).
+
+### Sync pipeline assembled (client review fix)
+
+The individual pieces existed but were never wired into a runnable pipeline —
+`ingestTasks`, `isProjectInScope`, and `connection_optouts` had no callers. Now
+assembled:
+- **`sync.js#syncConnection`** — the orchestration: for each in-scope list
+  (`isProjectInScope`), fetch via the connector, **exclude tasks assigned to an
+  opted-out employee** (`connection_optouts`, matched on id AND email), apply
+  field-level scope, sanitize, `ingestTasks`, then `purgeExpiredTasks` (retention).
+- **`POST /api/integrations/[platform]/sync`** — the "Sync now" action.
+- **`optouts.js` + `/optouts` API** — add/list/remove employee opt-outs (hashed).
+- **UI** — project include/exclude inputs, a **Sync now** button (shows ingested /
+  excluded counts), and opt-out management in `ConnectionSetup`.
+- **Bug caught by the new e2e test:** opt-out matching hashed only the assignee
+  *id*, but opt-outs are added by *email* — fixed to match on both.
+
+Verified end-to-end on the real DB: 3 fetched → 1 excluded by opt-out (that task
+NOT stored) → 2 ingested → L2 excluded from fetch → secret + email redacted
+through the pipeline. Tests: `tests/workIntelligenceSync.test.js` (5 e2e cases:
+scope filter, opt-out exclusion, reads-nothing-when-unscoped, read-disabled,
+field-scope drop). Full suite 582.

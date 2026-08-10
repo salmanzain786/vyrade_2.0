@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Unplug, ShieldCheck, Eye, Database, Clock } from 'lucide-react';
+import { Save, Unplug, ShieldCheck, Eye, Database, Clock, RefreshCw, UserMinus, Trash2 } from 'lucide-react';
 
 const Toggle = ({ label, hint, checked, onChange, danger }) => (
   <label className="flex items-start gap-2.5 py-1.5">
@@ -18,9 +18,36 @@ export default function ConnectionSetup({ platform, connection }) {
   const [gov, setGov] = useState(connection.governance);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [optouts, setOptouts] = useState([]);
+  const [optEmail, setOptEmail] = useState('');
 
   const setField = (k, v) => setScope((s) => ({ ...s, fields: { ...s.fields, [k]: v } }));
   const setRule = (k, v) => setScope((s) => ({ ...s, sensitive_rules: { ...s.sensitive_rules, [k]: v } }));
+  const setList = (k, v) => setScope((s) => ({ ...s, [k]: v.split(',').map((x) => x.trim()).filter(Boolean) }));
+
+  const loadOptouts = () => fetch(`/api/integrations/${platform}/optouts`).then((r) => r.json()).then((j) => setOptouts(j.optouts || [])).catch(() => {});
+  useEffect(() => { loadOptouts(); }, []); // eslint-disable-line
+
+  async function syncNow() {
+    setSyncing(true); setSyncResult(null);
+    try {
+      const res = await fetch(`/api/integrations/${platform}/sync`, { method: 'POST' });
+      const j = await res.json();
+      setSyncResult(res.ok ? j : { error: j.error || 'Sync failed' });
+      router.refresh();
+    } catch (e) { setSyncResult({ error: e.message }); } finally { setSyncing(false); }
+  }
+  async function addOptout() {
+    if (!optEmail.trim()) return;
+    await fetch(`/api/integrations/${platform}/optouts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee: optEmail.trim() }) });
+    setOptEmail(''); loadOptouts();
+  }
+  async function removeOptout(ref) {
+    await fetch(`/api/integrations/${platform}/optouts?ref=${encodeURIComponent(ref)}`, { method: 'DELETE' });
+    loadOptouts();
+  }
 
   async function save() {
     setBusy(true); setMsg(null);
@@ -69,7 +96,15 @@ export default function ConnectionSetup({ platform, connection }) {
             <Toggle label="Exclude personal projects" checked={scope.sensitive_rules.exclude_personal_projects} onChange={(v) => setRule('exclude_personal_projects', v)} />
           </div>
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Projects/lists are selected per workspace once you pick which to include — until then, nothing is read.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm">Included projects / lists <span className="text-[11px] text-muted-foreground">(IDs, comma-separated)</span>
+            <input value={(scope.projects || []).join(', ')} onChange={(e) => setList('projects', e.target.value)} placeholder="e.g. 901100234, 901100987" className={`mt-1 w-full ${sel}`} />
+          </label>
+          <label className="block text-sm">Excluded projects / lists
+            <input value={(scope.excluded_projects || []).join(', ')} onChange={(e) => setList('excluded_projects', e.target.value)} placeholder="IDs to always skip" className={`mt-1 w-full ${sel}`} />
+          </label>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">Vyrade reads only the included lists (minus exclusions). Until at least one is added, nothing is read.</p>
       </section>
 
       {/* 1.4 Governance & consent */}
@@ -104,10 +139,41 @@ export default function ConnectionSetup({ platform, connection }) {
         <Toggle label="Infer individual performance" hint="OFF by design — Vyrade analyses work patterns, not who is “inefficient.”" danger checked={gov.analyze_personal_performance} onChange={(v) => setGov((g) => ({ ...g, analyze_personal_performance: v }))} />
       </section>
 
-      <div className="flex items-center gap-3">
+      {/* Employee opt-outs (1.4) */}
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><UserMinus className="h-4 w-4 text-blue-600 dark:text-blue-400" />Employee opt-outs</h2>
+        <p className="mb-2 text-[11px] text-muted-foreground">Any task assigned to an opted-out person is excluded from analysis. Identities are stored hashed — only a hint is shown.</p>
+        <div className="flex items-end gap-2">
+          <input value={optEmail} onChange={(e) => setOptEmail(e.target.value)} placeholder="employee@company.com" className={`w-64 ${sel}`} />
+          <button onClick={addOptout} className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent">Add opt-out</button>
+        </div>
+        {optouts.length > 0 && (
+          <ul className="mt-3 space-y-1">
+            {optouts.map((o) => (
+              <li key={o.employee_ref} className="flex items-center gap-3 rounded-md border border-border px-3 py-1.5 text-xs">
+                <code>{o.hint}</code>
+                <button onClick={() => removeOptout(o.employee_ref)} className="ml-auto text-muted-foreground hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Save + Sync */}
+      <div className="flex flex-wrap items-center gap-3">
         <button onClick={save} disabled={busy} className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"><Save className="h-4 w-4" />{busy ? 'Saving…' : 'Save scope & governance'}</button>
+        <button onClick={syncNow} disabled={syncing} className="inline-flex items-center gap-1.5 rounded-md border border-blue-600/40 bg-blue-600/10 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-600/20 disabled:opacity-60 dark:text-blue-400"><RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />{syncing ? 'Syncing…' : 'Sync now'}</button>
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
       </div>
+      {syncResult && (
+        <div className={`rounded-lg border p-3 text-xs ${syncResult.error ? 'border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-400' : 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400'}`}>
+          {syncResult.error
+            ? syncResult.error
+            : syncResult.note
+              ? syncResult.note
+              : `Synced ${syncResult.lists_synced} list(s): ${syncResult.tasks_ingested} task(s) ingested, ${syncResult.tasks_excluded_optout} excluded by opt-out. Save scope first if you changed project IDs.`}
+        </div>
+      )}
     </div>
   );
 }
