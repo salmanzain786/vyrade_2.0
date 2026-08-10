@@ -7,8 +7,10 @@ import { generateBlueprintReport } from '@/lib/services/report/blueprintReport.j
 import { getLatestScan } from '@/lib/services/scanner/scanRepository';
 import { executionMetrics } from '@/lib/services/telemetry/telemetryRepository';
 import { getImplementation } from '@/lib/services/adoption/implementationRepository';
+import { getLink } from '@/lib/services/work-intelligence/writeback/taskLinkRepository';
 import { VyradeMark } from '@/components/VyradeLogo';
 import ImplementationPanel from '@/components/adoption/ImplementationPanel';
+import WriteBackPanel from '@/components/work-intelligence/WriteBackPanel';
 import PrintButton from '@/components/report/PrintButton';
 import { cn, formatMoney } from '@/lib/utils';
 
@@ -47,9 +49,10 @@ export default async function ReportPage({ params }) {
   const s = report.sections;
 
   // Phase 4 — execution telemetry (measured) + implementation (self-reported).
-  const [telemetry, impl] = await Promise.all([
+  const [telemetry, impl, taskLink] = await Promise.all([
     executionMetrics(params.id, { days: 30 }).catch(() => ({ has_data: false })),
     getImplementation(params.id).catch(() => null),
+    getLink(params.id).catch(() => null), // Work Intelligence write-back link
   ]);
 
   // Phase 8.1 — governance status per Blueprint, from the latest persisted scan.
@@ -119,6 +122,9 @@ export default async function ReportPage({ params }) {
             <p className="mt-2 text-xs text-muted-foreground">This automation hasn’t been scanned for governance &amp; compliance yet.</p>
           )}
         </div>
+
+        {/* Work Intelligence write-back (Phase 4) — only for task-sourced Blueprints */}
+        {taskLink?.external_task_id && <WriteBackPanel blueprintId={params.id} link={taskLink} />}
 
         {/* Implementation tracking (Phase 3) */}
         <ImplementationPanel blueprintId={params.id} />

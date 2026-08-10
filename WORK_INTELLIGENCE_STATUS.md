@@ -118,3 +118,20 @@ was needed, including a rules-based text heuristic for common-tool usage (#9).
 **Org/manager scoping:** opportunities store `org_id`; `listOrgOpportunities`
 supports an admin/manager view. Per the plan, deeper department-scoped review maps
 onto the existing org model — foundation in place, richer scoping is a follow-on.
+
+## Phase 4 — Automation Project Synchronisation (write-back) — ✅ done
+
+Projects a task-sourced Blueprint's lifecycle back onto its originating task.
+
+| Milestone | Status | Notes |
+|---|---|---|
+| 4.1 Write-back permission | ✅ | A **separate consent from read** — reuses the Phase-1 `scope.write_back_enabled` toggle (OFF by default). `writeback/sync.js` **refuses** any write when it's off (verified: read-enabled + write-off → `write_back_disabled`, no API call). |
+| 4.2 Progress sync | ✅ | `writeback/lifecycle.js#deriveLifecycleStage` projects the spec's 10-stage lifecycle (clarification → requirements → architecture → cost → implementation prepared → security → testing → deployment → active → outcome) from Vyrade's EXISTING signals (blueprint status, workflow, governance scan, implementation) — no new tracking. `syncBlueprintProgress` posts an update comment to the task via the connector (`clickup.postComment`), **idempotently** (only when the stage advanced). `POST /api/blueprints/[id]/sync-progress`. |
+| 4.3 Bi-directional linking | ✅ | `blueprint_task_links` — created at Blueprint generation (in `generate.js`, best-effort). Blueprint→task: the report page's write-back panel links to the task; task→Blueprint: each synced comment carries the Blueprint's report URL. Surfaced on both sides. |
+
+**Verified on the real DB:** write-back OFF → refused with no API call; ON → the
+gate opens and it attempts the platform write (throws at the live ClickUp call
+with a fake token, proving it got past the gate). Tests: `tests/writeback.test.js`
+(lifecycle derivation across all stages, permission gating on/off, idempotency,
+not-linked). Full suite 618. Live write-back needs a real ClickUp token; the gate,
+lifecycle projection, linking and comment payload are all built + tested.

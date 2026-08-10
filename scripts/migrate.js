@@ -69,6 +69,7 @@ async function migrate() {
   await runFile(connection, 'work_intelligence.sql', { tolerant: true });
   await runFile(connection, 'task_discovery.sql', { tolerant: true });
   await runFile(connection, 'work_opportunities.sql', { tolerant: true });
+  await runFile(connection, 'blueprint_task_links.sql', { tolerant: true });
 
   console.log('Migration applied successfully.');
   await connection.end();
