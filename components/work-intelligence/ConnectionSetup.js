@@ -22,6 +22,10 @@ export default function ConnectionSetup({ platform, connection }) {
   const [syncResult, setSyncResult] = useState(null);
   const [optouts, setOptouts] = useState([]);
   const [optEmail, setOptEmail] = useState('');
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [projectsError, setProjectsError] = useState(null);
+  const [projectSearch, setProjectSearch] = useState('');
 
   const setField = (k, v) => setScope((s) => ({ ...s, fields: { ...s.fields, [k]: v } }));
   const setRule = (k, v) => setScope((s) => ({ ...s, sensitive_rules: { ...s.sensitive_rules, [k]: v } }));
@@ -29,6 +33,25 @@ export default function ConnectionSetup({ platform, connection }) {
 
   const loadOptouts = () => fetch(`/api/integrations/${platform}/optouts`).then((r) => r.json()).then((j) => setOptouts(j.optouts || [])).catch(() => {});
   useEffect(() => { loadOptouts(); }, []); // eslint-disable-line
+
+  // Fetch the real project/list hierarchy so the user picks by name (not IDs).
+  useEffect(() => {
+    fetch(`/api/integrations/${platform}/projects`)
+      .then((r) => r.json())
+      .then((j) => { setProjectOptions(j.projects || []); if (j.error) setProjectsError(j.error); })
+      .catch(() => setProjectsError('Could not load projects'))
+      .finally(() => setLoadingProjects(false));
+  }, []); // eslint-disable-line
+
+  const toggleProject = (id) => setScope((s) => {
+    const set = new Set(s.projects || []);
+    set.has(id) ? set.delete(id) : set.add(id);
+    return { ...s, projects: [...set] };
+  });
+  const q = projectSearch.trim().toLowerCase();
+  const filteredProjects = q
+    ? projectOptions.filter((p) => `${p.name} ${p.space} ${p.workspace}`.toLowerCase().includes(q))
+    : projectOptions;
 
   async function syncNow() {
     setSyncing(true); setSyncResult(null);
@@ -96,15 +119,45 @@ export default function ConnectionSetup({ platform, connection }) {
             <Toggle label="Exclude personal projects" checked={scope.sensitive_rules.exclude_personal_projects} onChange={(v) => setRule('exclude_personal_projects', v)} />
           </div>
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">Included projects / lists <span className="text-[11px] text-muted-foreground">(IDs, comma-separated)</span>
-            <input value={(scope.projects || []).join(', ')} onChange={(e) => setList('projects', e.target.value)} placeholder="e.g. 901100234, 901100987" className={`mt-1 w-full ${sel}`} />
-          </label>
-          <label className="block text-sm">Excluded projects / lists
+        <div className="mt-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Included projects / lists</span>
+            <span className="text-[11px] text-muted-foreground">{(scope.projects || []).length} selected</span>
+          </div>
+
+          {loadingProjects ? (
+            <p className="mt-1 text-xs text-muted-foreground">Loading your projects from ClickUp…</p>
+          ) : projectOptions.length > 0 ? (
+            <div className="mt-1 rounded-md border border-border">
+              <input value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} placeholder="Search projects / lists…" className="w-full border-b border-border bg-background px-3 py-1.5 text-sm" />
+              <div className="max-h-52 overflow-y-auto p-1">
+                {filteredProjects.length === 0 && <p className="px-2 py-2 text-xs text-muted-foreground">No match.</p>}
+                {filteredProjects.map((p) => {
+                  const checked = (scope.projects || []).includes(p.id);
+                  return (
+                    <label key={p.id} className="flex items-start gap-2.5 rounded px-2 py-1.5 hover:bg-accent">
+                      <input type="checkbox" checked={checked} onChange={() => toggleProject(p.id)} className="mt-0.5 h-4 w-4 accent-blue-600" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm">{p.name}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">{p.workspace} › {p.space}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <>
+              <input value={(scope.projects || []).join(', ')} onChange={(e) => setList('projects', e.target.value)} placeholder="list IDs, comma-separated" className={`mt-1 w-full ${sel}`} />
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{projectsError ? `Couldn’t load projects (${projectsError}) — enter list IDs manually.` : 'No projects returned yet — enter list IDs manually, or reconnect ClickUp.'}</p>
+            </>
+          )}
+
+          <label className="mt-3 block text-sm">Excluded projects / lists <span className="text-[11px] text-muted-foreground">(IDs, comma-separated)</span>
             <input value={(scope.excluded_projects || []).join(', ')} onChange={(e) => setList('excluded_projects', e.target.value)} placeholder="IDs to always skip" className={`mt-1 w-full ${sel}`} />
           </label>
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">Vyrade reads only the included lists (minus exclusions). Until at least one is added, nothing is read.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Vyrade reads only the selected lists (minus exclusions). Until at least one is selected, nothing is read.</p>
       </section>
 
       {/* 1.4 Governance & consent */}

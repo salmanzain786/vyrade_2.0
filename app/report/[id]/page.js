@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth/session';
 import { assertBlueprintOwner } from '@/lib/auth/ownership';
-import { getLatest } from '@/lib/services/blueprintRepository.js';
+import { getLatest, getLatestWorkflowRecord } from '@/lib/services/blueprintRepository.js';
 import { generateBlueprintReport } from '@/lib/services/report/blueprintReport.js';
 import { getLatestScan } from '@/lib/services/scanner/scanRepository';
 import { executionMetrics } from '@/lib/services/telemetry/telemetryRepository';
@@ -10,6 +10,7 @@ import { getImplementation } from '@/lib/services/adoption/implementationReposit
 import { getLink } from '@/lib/services/work-intelligence/writeback/taskLinkRepository';
 import { taskCostSignals } from '@/lib/services/work-intelligence/costSignals';
 import { VyradeMark } from '@/components/VyradeLogo';
+import GenerateWorkflowPanel from '@/components/report/GenerateWorkflowPanel';
 import ImplementationPanel from '@/components/adoption/ImplementationPanel';
 import WriteBackPanel from '@/components/work-intelligence/WriteBackPanel';
 import PrintButton from '@/components/report/PrintButton';
@@ -56,6 +57,7 @@ export default async function ReportPage({ params }) {
     getLink(params.id).catch(() => null), // Work Intelligence write-back link
     taskCostSignals(params.id).catch(() => null), // 5.1 task-derived cost inputs
   ]);
+  const workflowRecord = await getLatestWorkflowRecord(params.id).catch(() => null);
 
   // Phase 8.1 — governance status per Blueprint, from the latest persisted scan.
   const gov = await getLatestScan(params.id).catch(() => null);
@@ -124,6 +126,17 @@ export default async function ReportPage({ params }) {
             <p className="mt-2 text-xs text-muted-foreground">This automation hasn’t been scanned for governance &amp; compliance yet.</p>
           )}
         </div>
+
+        {/* Generate the workflow from this Blueprint (or a prompt to complete it first) */}
+        <GenerateWorkflowPanel
+          blueprintId={params.id}
+          version={record.version}
+          sessionId={record.session_id}
+          status={record.status}
+          readinessScore={record.readiness?.score}
+          hasWorkflow={!!workflowRecord}
+          isCurrent={record.is_current !== false}
+        />
 
         {/* Work Intelligence write-back (Phase 4) — only for task-sourced Blueprints */}
         {taskLink?.external_task_id && <WriteBackPanel blueprintId={params.id} link={taskLink} />}
