@@ -32,9 +32,9 @@ export default function RemediateButton({ blueprintId }) {
       <button
         onClick={remediate}
         disabled={busy}
-        className="inline-flex items-center gap-1.5 rounded-md border border-blue-600/40 bg-blue-600/10 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-600/20 disabled:opacity-60 dark:text-blue-400"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-100 disabled:opacity-60"
       >
-        <Wand2 className="h-3.5 w-3.5" />{busy ? 'Regenerating & re-scanning…' : 'Regenerate to fix findings'}
+        <Wand2 className="h-4 w-4" />{busy ? 'Regenerating & re-scanning…' : 'Regenerate to fix findings'}
       </button>
       {error && <span className="max-w-xs text-right text-[11px] text-red-600 dark:text-red-400">{error}</span>}
       {result && (

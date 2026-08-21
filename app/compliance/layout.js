@@ -1,9 +1,9 @@
 import { getCurrentUser } from '@/lib/auth/session';
 import AppShellRail from '@/components/shell/AppShellRail';
 
-// Shared chrome for the individual adoption dashboard (Phase 1/3/4 pages).
-// Uses the same homepage icon rail across the app for a consistent shell.
-export default async function DashboardLayout({ children }) {
+// Shared chrome for compliance / assurance pages — same centralised rail and
+// content surface as the dashboard and organisation sections.
+export default async function ComplianceLayout({ children }) {
   const user = await getCurrentUser();
   return <AppShellRail user={user}>{children}</AppShellRail>;
 }

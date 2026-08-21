@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { Plus, History, User, LogOut, Sun, Moon, Search, MessageSquare, Gauge, Building2, ListTodo } from 'lucide-react';
+import { Plus, History, User, LogOut, Sun, Moon, Search, MessageSquare, Gauge, Building2, ListTodo, CircleUser, Activity, Sparkles, Users } from 'lucide-react';
 import { cn, formatMoney } from '@/lib/utils';
 import { VyradeMark } from '@/components/VyradeLogo';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -11,6 +12,18 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { track, resetAnalytics } from '@/lib/analytics/mixpanel';
 import { EVENTS } from '@/lib/analytics/events';
+
+// Centralised section nav — identical on every page (chat, dashboard, org).
+const NAV = [
+  { href: '/dashboard', label: 'Your AI Adaptability', icon: Gauge, exact: true },
+  { href: '/dashboard/profile', label: 'Profile', icon: CircleUser },
+  { href: '/dashboard/telemetry', label: 'Telemetry', icon: Activity },
+  { href: '/org', label: 'Organisation', icon: Building2, exact: true },
+  { href: '/org/opportunities', label: 'Opportunities', icon: Sparkles },
+  { href: '/org/members', label: 'Members', icon: Users },
+  { href: '/work/tasks', label: 'Work Intelligence', icon: ListTodo },
+];
+const isNavActive = (pathname, item) => (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`));
 
 const navItemClass =
   'flex size-10 items-center justify-center rounded-lg hover:bg-accent hover:text-accent-foreground transition-colors text-foreground';
@@ -24,6 +37,7 @@ function formatCost(v) {
 }
 
 export default function AppSidebar({ user, conversations = [], currentSessionId, onNewChat, onSelect }) {
+  const pathname = usePathname() || '';
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -52,7 +66,9 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
 
   const initial = (user?.name || user?.email || '?').trim().charAt(0).toUpperCase();
 
-  const ProfileMenu = () => (
+  // `showLinks` renders the section links inside the menu — used on mobile,
+  // where there's no icon rail. On desktop the rail carries these links.
+  const ProfileMenu = ({ showLinks = false }) => (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600/20 text-sm font-semibold text-blue-500">
@@ -63,25 +79,20 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
           <span className="truncate text-xs text-muted-foreground">{user?.email}</span>
         </div>
       </div>
-      <div className="h-px bg-border" />
-      <a
-        href="/dashboard"
-        className="flex items-center gap-2 w-full p-2 rounded-md text-sm text-foreground hover:bg-accent transition-colors"
-      >
-        <Gauge className="h-4 w-4" /><span>Your AI Adaptability</span>
-      </a>
-      <a
-        href="/org"
-        className="flex items-center gap-2 w-full p-2 rounded-md text-sm text-foreground hover:bg-accent transition-colors"
-      >
-        <Building2 className="h-4 w-4" /><span>Organisation</span>
-      </a>
-      <a
-        href="/work/tasks"
-        className="flex items-center gap-2 w-full p-2 rounded-md text-sm text-foreground hover:bg-accent transition-colors"
-      >
-        <ListTodo className="h-4 w-4" /><span>Work Intelligence</span>
-      </a>
+      {showLinks && (
+        <>
+          <div className="h-px bg-border" />
+          {NAV.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className="flex items-center gap-2 w-full p-2 rounded-md text-sm text-foreground hover:bg-accent transition-colors"
+            >
+              <item.icon className="h-4 w-4" /><span>{item.label}</span>
+            </a>
+          ))}
+        </>
+      )}
       <div className="h-px bg-border" />
       <button
         onClick={signOut}
@@ -105,12 +116,12 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
   return (
     <TooltipProvider delayDuration={200}>
       {/* ── Desktop icon rail ── */}
-      <aside className="fixed left-0 top-0 z-40 h-screen w-16 border-r bg-background hidden sm:flex flex-col items-center py-4 gap-4">
+      <aside className="fixed left-0 top-0 z-40 h-screen w-16 border-r bg-background hidden sm:flex flex-col items-center py-4 gap-4 print:hidden">
         <button onClick={onNewChat} className="mb-2 flex size-10 items-center justify-center rounded-lg" aria-label="Vyrade">
           <VyradeMark className="h-[26px] w-auto" />
         </button>
 
-        <nav className="flex flex-col gap-2">
+        <nav className="flex flex-1 flex-col items-center gap-2 overflow-y-auto scrollbar-hide">
           <Tooltip>
             <TooltipTrigger asChild>
               <button onClick={onNewChat} className={navItemClass}><Plus className="h-6 w-6" /></button>
@@ -129,9 +140,26 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
             </TooltipTrigger>
             <TooltipContent side="right"><p>Chat History</p></TooltipContent>
           </Tooltip>
-        </nav>
 
-        <div className="flex-1" />
+          <div className="mx-auto my-1 h-px w-6 shrink-0 bg-border" />
+
+          {NAV.map((item) => {
+            const active = isNavActive(pathname, item);
+            return (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>
+                  <a
+                    href={item.href}
+                    className={cn(navItemClass, active && 'bg-blue-600/15 text-blue-500 hover:bg-blue-600/20 hover:text-blue-500')}
+                  >
+                    <item.icon className="h-5 w-5" />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="right"><p>{item.label}</p></TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </nav>
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -158,7 +186,7 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
       </aside>
 
       {/* ── Mobile bottom nav ── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t bg-background flex sm:hidden items-center px-1">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 border-t bg-background flex sm:hidden items-center px-1 print:hidden">
         <button onClick={onNewChat} className={mobileNavItemClass}>
           <Plus className="h-5 w-5" /><span className="text-[10px] font-medium">New</span>
         </button>
@@ -175,7 +203,7 @@ export default function AppSidebar({ user, conversations = [], currentSessionId,
               <User className="h-5 w-5" /><span className="text-[10px] font-medium">Profile</span>
             </button>
           </PopoverTrigger>
-          <PopoverContent side="top" align="end" sideOffset={8} className="w-64"><ProfileMenu /></PopoverContent>
+          <PopoverContent side="top" align="end" sideOffset={8} className="w-64"><ProfileMenu showLinks /></PopoverContent>
         </Popover>
       </nav>
 

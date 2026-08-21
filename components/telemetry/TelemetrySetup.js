@@ -44,15 +44,15 @@ Content-Type: application/json
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-border bg-card p-5">
-        <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold"><KeyRound className="h-4 w-4 text-blue-600 dark:text-blue-400" />Ingestion tokens</h2>
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold"><span className="grid h-7 w-7 place-items-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400"><KeyRound className="h-4 w-4" /></span>Ingestion tokens</h2>
         <p className="mb-3 text-xs text-muted-foreground">Create a token, then have your automation platform POST each run to the ingest URL with it. Tokens are shown once.</p>
 
         <div className="flex items-end gap-2">
-          <label className="flex flex-col text-xs text-muted-foreground">Label (optional)
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Prod n8n" className="mt-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm" />
+          <label className="flex flex-1 flex-col text-xs text-muted-foreground">Label (optional)
+            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Prod n8n" className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-sm transition-colors focus:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
           </label>
-          <button onClick={create} disabled={busy} className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"><Plus className="h-4 w-4" />New token</button>
+          <button onClick={create} disabled={busy} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60"><Plus className="h-4 w-4" />New token</button>
         </div>
 
         {fresh && (
@@ -65,7 +65,7 @@ Content-Type: application/json
         {tokens.length > 0 && (
           <ul className="mt-3 space-y-1">
             {tokens.map((t) => (
-              <li key={t.token_hint} className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm">
+              <li key={t.token_hint} className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm transition-colors hover:bg-muted/40">
                 <code className="text-xs">{t.token_hint}</code>
                 <span className="text-xs text-muted-foreground">{t.label || '—'}{t.revoked ? ' · revoked' : ''}{t.last_used_at ? ` · used ${new Date(t.last_used_at).toLocaleDateString()}` : ''}</span>
                 {!t.revoked && <button onClick={() => revoke(t.token_hint)} className="ml-auto text-muted-foreground hover:text-red-600" title="Revoke"><Trash2 className="h-3.5 w-3.5" /></button>}
@@ -75,7 +75,7 @@ Content-Type: application/json
         )}
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-5">
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="mb-1 text-sm font-semibold">Wire it up (n8n)</h2>
         <p className="mb-3 text-xs text-muted-foreground">
           Add an <strong>HTTP Request</strong> node at the end of your workflow (and in its <strong>Error Workflow</strong>) that POSTs to the ingest URL. Set the <code>x-telemetry-token</code> header and send the run’s status. Make and Zapier use the same contract (an HTTP/webhook action).

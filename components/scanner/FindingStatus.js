@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const OPTIONS = [
   { value: 'open', label: 'Open' },
@@ -36,14 +37,13 @@ export default function FindingStatus({ blueprintId, type, node = null, initial 
   }
 
   return (
-    <select
-      value={status}
-      disabled={busy}
-      onChange={(e) => change(e.target.value)}
-      className={`rounded-full border bg-transparent px-2 py-0.5 text-[11px] font-medium ${TONE[status] || TONE.open}`}
-      title="Resolution status"
-    >
-      {OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <Select value={status} onValueChange={change} disabled={busy}>
+      <SelectTrigger className={`h-7 w-[130px] rounded-full px-3 text-xs font-medium shadow-none ${TONE[status] || TONE.open}`}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {OPTIONS.map((o) => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
   );
 }

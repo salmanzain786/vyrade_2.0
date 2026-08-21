@@ -17,7 +17,7 @@ module.exports = {
     },
     extend: {
       fontFamily: {
-        sans: ['Geomanist', 'var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Poppins', 'var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
       colors: {

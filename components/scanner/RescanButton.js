@@ -36,9 +36,9 @@ export default function RescanButton({ blueprintId }) {
       <button
         onClick={rescan}
         disabled={busy}
-        className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60"
       >
-        <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
+        <RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
         {busy ? 'Scanning…' : 'Re-scan now'}
       </button>
     </div>
