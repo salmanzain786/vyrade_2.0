@@ -34,14 +34,15 @@ function NavLink({ item, active, compact }) {
     <a
       href={item.href}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+        'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
         compact && 'flex-col gap-1 px-3 py-1.5 text-xs',
         active
-          ? 'bg-blue-600/10 font-medium text-blue-600 dark:bg-blue-500/15 dark:text-blue-400'
+          ? 'bg-blue-600/10 font-medium text-blue-600 shadow-sm dark:bg-blue-500/15 dark:text-blue-400'
           : 'text-muted-foreground hover:bg-accent hover:text-foreground',
       )}
     >
-      <Icon className={cn('h-4 w-4 shrink-0', active && 'text-blue-600 dark:text-blue-400')} />
+      {active && !compact && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-blue-600 dark:bg-blue-400" />}
+      <Icon className={cn('h-4 w-4 shrink-0 transition-colors', active ? 'text-blue-600 dark:text-blue-400' : 'group-hover:text-foreground')} />
       <span className={cn(!compact && 'truncate')}>{item.label}</span>
     </a>
   );

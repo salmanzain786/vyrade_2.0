@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import AppSidebar from '@/components/shell/AppSidebar';
@@ -375,7 +376,11 @@ export default function ChatWorkspace({ sessionId, user }) {
     }
   }
 
-  const empty = messages.length === 0 && !thinking;
+  // Only the settled empty-chat state shows the hero. While the conversation is
+  // still hydrating from the DB, `messages` is [] but we must NOT render the
+  // hero — otherwise a refresh flashes the "new automation" landing before the
+  // real transcript loads.
+  const empty = !loadingChat && messages.length === 0 && !thinking;
   const statusColor =
     readiness?.status === 'requirements_complete' ? 'bg-green-500'
     : blueprintId ? 'bg-amber-500' : 'bg-muted-foreground/40';
@@ -406,7 +411,11 @@ export default function ChatWorkspace({ sessionId, user }) {
         {/* Chat (left) + Blueprint (right column) */}
         <div className="flex-1 min-h-0 flex">
           <main className="relative flex-1 min-w-0 flex flex-col">
-            {empty ? (
+            {loadingChat ? (
+              <div className="flex flex-1 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : empty ? (
               <div className="flex flex-1 flex-col items-center justify-center px-4">
                 <div className="w-full max-w-3xl mx-auto flex flex-col items-center">
                   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground text-center mb-2 leading-tight">

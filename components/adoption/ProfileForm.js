@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Save } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const DEPARTMENTS = [
   ['marketing', 'Marketing'], ['sales', 'Sales'], ['finance', 'Finance'], ['support', 'Customer Support'],
@@ -18,7 +19,17 @@ const Field = ({ label, hint, children }) => (
     <div className="mt-1">{children}</div>
   </label>
 );
-const input = 'w-full rounded-md border border-border bg-background px-3 py-2 text-sm';
+const input = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-sm transition-colors focus:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
+
+// shadcn Select styled to match the text inputs above.
+const SelectBox = ({ value, onChange, options, placeholder = 'Select…' }) => (
+  <Select value={value || undefined} onValueChange={onChange}>
+    <SelectTrigger className="h-auto rounded-lg py-2 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"><SelectValue placeholder={placeholder} /></SelectTrigger>
+    <SelectContent>
+      {options.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+    </SelectContent>
+  </Select>
+);
 
 export default function ProfileForm({ compact = false }) {
   const router = useRouter();
@@ -51,15 +62,15 @@ export default function ProfileForm({ compact = false }) {
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Role" hint="e.g. Marketing Manager"><input className={input} value={p.role || ''} onChange={(e) => set('role', e.target.value)} placeholder="Marketing Manager" /></Field>
-        <Field label="Department"><select className={input} value={p.department || ''} onChange={(e) => set('department', e.target.value)}><option value="">Select…</option>{DEPARTMENTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
+        <Field label="Department"><SelectBox value={p.department} onChange={(v) => set('department', v)} options={DEPARTMENTS} /></Field>
         <Field label="Industry" hint="e.g. SaaS, e-commerce, agency"><input className={input} value={p.industry || ''} onChange={(e) => set('industry', e.target.value)} placeholder="SaaS" /></Field>
-        <Field label="Company size"><select className={input} value={p.company_size || ''} onChange={(e) => set('company_size', e.target.value)}><option value="">Select…</option>{SIZES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
+        <Field label="Company size"><SelectBox value={p.company_size} onChange={(v) => set('company_size', v)} options={SIZES} /></Field>
       </div>
 
       {!compact && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Job title"><input className={input} value={p.job_title || ''} onChange={(e) => set('job_title', e.target.value)} /></Field>
-          <Field label="Technical skill level"><select className={input} value={p.technical_skill || ''} onChange={(e) => set('technical_skill', e.target.value)}><option value="">Select…</option>{SKILLS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
+          <Field label="Technical skill level"><SelectBox value={p.technical_skill} onChange={(v) => set('technical_skill', v)} options={SKILLS} /></Field>
           <Field label="Main responsibilities" hint="comma-separated"><input className={input} value={listVal('responsibilities')} onChange={(e) => setList('responsibilities', e.target.value)} placeholder="reporting, campaigns, lead gen" /></Field>
           <Field label="Current AI tools" hint="comma-separated"><input className={input} value={listVal('current_ai_tools')} onChange={(e) => setList('current_ai_tools', e.target.value)} placeholder="ChatGPT, Copilot" /></Field>
           <Field label="Automation platforms" hint="comma-separated"><input className={input} value={listVal('automation_platforms')} onChange={(e) => setList('automation_platforms', e.target.value)} placeholder="Zapier, Make" /></Field>
@@ -68,7 +79,7 @@ export default function ProfileForm({ compact = false }) {
       )}
 
       <div className="flex items-center gap-3">
-        <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
+        <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60">
           <Save className="h-4 w-4" />{saving ? 'Saving…' : 'Save profile'}
         </button>
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}

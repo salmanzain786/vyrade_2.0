@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
+import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth/session';
 import { assertBlueprintOwner } from '@/lib/auth/ownership';
 import { getLatest, getLatestWorkflowRecord } from '@/lib/services/blueprintRepository.js';
@@ -27,12 +28,12 @@ const money = (n, c) => formatMoney(n, c) ?? '—';
 
 function Section({ n, title, children }) {
   return (
-    <section className="mb-8 break-inside-avoid">
-      <h2 className="mb-3 flex items-center gap-2 border-b border-border pb-1.5 text-[15px] font-semibold text-foreground">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 font-mono text-[10px] text-primary">{n}</span>
+    <section className="mb-10 break-inside-avoid print:mb-8">
+      <h2 className="mb-4 flex items-center gap-2.5 border-b border-border pb-2.5 text-xl font-semibold text-foreground print:text-lg">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 font-mono text-xs text-primary">{n}</span>
         {title}
       </h2>
-      <div className="text-[13px] leading-relaxed text-foreground">{children}</div>
+      <div className="text-[15px] leading-7 text-foreground print:text-[13px] print:leading-relaxed">{children}</div>
     </section>
   );
 }
@@ -66,23 +67,33 @@ export default async function ReportPage({ params }) {
   const govRiskTone = { High: 'text-red-600 dark:text-red-400', Medium: 'text-amber-600 dark:text-amber-400', Low: 'text-emerald-600 dark:text-emerald-400' };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border print:hidden">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3">
-          <Link href={`/chat/${record.session_id || ''}`} className="flex items-center gap-2">
-            <VyradeMark className="h-6 w-auto" /><span className="text-sm font-semibold">Vyrade</span>
-          </Link>
-          <div className="flex items-center gap-3 print:hidden">
-            <Link href={`/compliance/${params.id}`} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent">Governance &amp; Compliance</Link>
+    <div className="w-full px-4 py-6 md:px-6 lg:px-8">
+      <Link href={`/chat/${record.session_id || ''}`} className="mb-5 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground print:hidden">
+        <ArrowLeft className="h-3.5 w-3.5" /> Back to workspace
+      </Link>
+
+      {/* Hero */}
+      <div className="rounded-2xl border border-border bg-card p-6 md:p-8 print:hidden">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400"><FileText className="h-6 w-6" /></span>
+            <div>
+              <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">Automation Blueprint Report</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">{record.blueprint.name || 'Untitled automation'}</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">Version {report.blueprint_version} · Confidence: <span className="capitalize">{report.confidence}</span></p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href={`/compliance/${params.id}`} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"><ShieldCheck className="h-4 w-4" /> Governance &amp; Compliance</Link>
             <PrintButton />
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="mx-auto max-w-3xl px-6 py-8 print:py-2">
-        {/* Cover */}
-        <div className="mb-8 border-b-2 border-primary/40 pb-4">
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Automation Blueprint Report</p>
+      <main className="mt-6 w-full print:mt-0 print:py-2">
+        {/* Print-only cover */}
+        <div className="mb-8 hidden border-b-2 border-primary/40 pb-4 print:block">
+          <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">Automation Blueprint Report</p>
           <h1 className="mt-1 text-2xl font-bold text-foreground">{record.blueprint.name || 'Untitled automation'}</h1>
           <p className="mt-1 text-xs text-muted-foreground">
             Version {report.blueprint_version} · Confidence: <span className="capitalize">{report.confidence}</span>
@@ -100,23 +111,23 @@ export default async function ReportPage({ params }) {
           {gov ? (
             <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3">
               <div>
-                <div className="text-[11px] text-muted-foreground">Readiness</div>
+                <div className="text-xs text-muted-foreground">Readiness</div>
                 <div className={`text-xl font-bold ${govBandTone(gov.readiness_pct)}`}>{gov.readiness_pct}%<span className="ml-1 text-xs font-normal text-muted-foreground">{gov.readiness_band}</span></div>
               </div>
               <div>
-                <div className="text-[11px] text-muted-foreground">Security risk</div>
+                <div className="text-xs text-muted-foreground">Security risk</div>
                 <div className={`text-xl font-bold ${govRiskTone[gov.security_risk_level] || ''}`}>{gov.security_risk_level || '—'}</div>
               </div>
               <div>
-                <div className="text-[11px] text-muted-foreground">Findings</div>
+                <div className="text-xs text-muted-foreground">Findings</div>
                 <div className="text-xl font-bold">{gov.findings_total}</div>
               </div>
               {govFrameworks.length > 0 && (
                 <div>
-                  <div className="text-[11px] text-muted-foreground">Frameworks</div>
+                  <div className="text-xs text-muted-foreground">Frameworks</div>
                   <div className="mt-0.5 flex flex-wrap gap-1">
                     {govFrameworks.map((fw) => (
-                      <span key={fw.framework} className={`rounded border px-1.5 py-0.5 text-[10px] ${fw.gap_areas ? 'border-amber-500/30 text-amber-600 dark:text-amber-400' : 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400'}`}>{fw.framework}: {fw.gap_areas ? `${fw.gap_areas} gap${fw.gap_areas === 1 ? '' : 's'}` : 'ok'}</span>
+                      <span key={fw.framework} className={`rounded border px-1.5 py-0.5 text-[11px] ${fw.gap_areas ? 'border-amber-500/30 text-amber-600 dark:text-amber-400' : 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400'}`}>{fw.framework}: {fw.gap_areas ? `${fw.gap_areas} gap${fw.gap_areas === 1 ? '' : 's'}` : 'ok'}</span>
                     ))}
                   </div>
                 </div>
@@ -146,18 +157,18 @@ export default async function ReportPage({ params }) {
           <div className="mb-8 rounded-lg border border-border bg-card p-4 print:hidden">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Task-derived cost inputs</span>
-              <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">Estimated</span>
+              <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400">Estimated</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-              <div><span className="font-medium">{costSignals.frequency_label}</span><div className="text-[11px] text-muted-foreground">frequency</div></div>
-              <div><span className="font-medium">{costSignals.assignees}</span><div className="text-[11px] text-muted-foreground">assignees</div></div>
-              <div><span className="font-medium">{costSignals.process_steps}</span><div className="text-[11px] text-muted-foreground">process steps</div></div>
-              {costSignals.estimated_manual_minutes != null && <div><span className="font-medium">~{costSignals.estimated_manual_minutes}m</span><div className="text-[11px] text-muted-foreground">est. manual time/run</div></div>}
-              <div><span className="font-medium">{costSignals.manual_review_steps}</span><div className="text-[11px] text-muted-foreground">manual-review steps</div></div>
-              {costSignals.average_cycle_days != null && <div><span className="font-medium">{costSignals.average_cycle_days}d</span><div className="text-[11px] text-muted-foreground">avg cycle time</div></div>}
-              {costSignals.related_task_count > 0 && <div><span className="font-medium">{costSignals.related_task_count}</span><div className="text-[11px] text-muted-foreground">related tasks</div></div>}
+              <div><span className="font-medium">{costSignals.frequency_label}</span><div className="text-xs text-muted-foreground">frequency</div></div>
+              <div><span className="font-medium">{costSignals.assignees}</span><div className="text-xs text-muted-foreground">assignees</div></div>
+              <div><span className="font-medium">{costSignals.process_steps}</span><div className="text-xs text-muted-foreground">process steps</div></div>
+              {costSignals.estimated_manual_minutes != null && <div><span className="font-medium">~{costSignals.estimated_manual_minutes}m</span><div className="text-xs text-muted-foreground">est. manual time/run</div></div>}
+              <div><span className="font-medium">{costSignals.manual_review_steps}</span><div className="text-xs text-muted-foreground">manual-review steps</div></div>
+              {costSignals.average_cycle_days != null && <div><span className="font-medium">{costSignals.average_cycle_days}d</span><div className="text-xs text-muted-foreground">avg cycle time</div></div>}
+              {costSignals.related_task_count > 0 && <div><span className="font-medium">{costSignals.related_task_count}</span><div className="text-xs text-muted-foreground">related tasks</div></div>}
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">Derived from the originating task to ground the cost estimate — estimates until confirmed.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Derived from the originating task to ground the cost estimate — estimates until confirmed.</p>
           </div>
         )}
 
@@ -169,28 +180,28 @@ export default async function ReportPage({ params }) {
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Execution telemetry</span>
             {telemetry.has_data
-              ? <span className="rounded-full border border-emerald-500/30 bg-emerald-500/5 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">Measured · last {telemetry.window_days}d</span>
+              ? <span className="rounded-full border border-emerald-500/30 bg-emerald-500/5 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Measured · last {telemetry.window_days}d</span>
               : <Link href="/dashboard/telemetry" className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">Connect platform →</Link>}
           </div>
           {telemetry.has_data ? (
             <>
               <div className="mt-3 flex flex-wrap items-center gap-x-8 gap-y-3">
-                <div><div className="text-xl font-bold">{telemetry.total}</div><div className="text-[11px] text-muted-foreground">runs</div></div>
-                <div><div className={`text-xl font-bold ${telemetry.success_rate >= 90 ? 'text-emerald-600 dark:text-emerald-400' : telemetry.success_rate >= 70 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>{telemetry.success_rate}%</div><div className="text-[11px] text-muted-foreground">success rate</div></div>
-                <div><div className="text-xl font-bold">{telemetry.avg_duration_ms == null ? '—' : `${(telemetry.avg_duration_ms / 1000).toFixed(1)}s`}</div><div className="text-[11px] text-muted-foreground">avg duration</div></div>
-                <div><div className="text-xl font-bold">{telemetry.intervention_rate ?? 0}%</div><div className="text-[11px] text-muted-foreground">human intervention</div></div>
-                <div><div className="text-xl font-bold">~{telemetry.measured_monthly_runs}</div><div className="text-[11px] text-muted-foreground">runs / month (measured)</div></div>
+                <div><div className="text-xl font-bold">{telemetry.total}</div><div className="text-xs text-muted-foreground">runs</div></div>
+                <div><div className={`text-xl font-bold ${telemetry.success_rate >= 90 ? 'text-emerald-600 dark:text-emerald-400' : telemetry.success_rate >= 70 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>{telemetry.success_rate}%</div><div className="text-xs text-muted-foreground">success rate</div></div>
+                <div><div className="text-xl font-bold">{telemetry.avg_duration_ms == null ? '—' : `${(telemetry.avg_duration_ms / 1000).toFixed(1)}s`}</div><div className="text-xs text-muted-foreground">avg duration</div></div>
+                <div><div className="text-xl font-bold">{telemetry.intervention_rate ?? 0}%</div><div className="text-xs text-muted-foreground">human intervention</div></div>
+                <div><div className="text-xl font-bold">~{telemetry.measured_monthly_runs}</div><div className="text-xs text-muted-foreground">runs / month (measured)</div></div>
               </div>
               {/* 4.4 — genuinely telemetry-derived hours saved (rate × measured runs) */}
               {impl?.minutes_saved_per_run ? (
-                <p className="mt-2 text-[11px] text-emerald-700 dark:text-emerald-400">
+                <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">
                   <strong>Measured hours saved: ~{Math.round((telemetry.measured_monthly_runs * impl.minutes_saved_per_run) / 60)}h/mo</strong> — {impl.minutes_saved_per_run} min/run × ~{telemetry.measured_monthly_runs} measured runs/month (telemetry-derived).
                 </p>
               ) : impl?.time_saved_hours != null ? (
-                <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400">Hours saved is still self-reported (~{impl.time_saved_hours}h/mo). Set <em>minutes saved / run</em> above to derive a measured figure from your ~{telemetry.measured_monthly_runs} confirmed runs/month.</p>
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">Hours saved is still self-reported (~{impl.time_saved_hours}h/mo). Set <em>minutes saved / run</em> above to derive a measured figure from your ~{telemetry.measured_monthly_runs} confirmed runs/month.</p>
               ) : null}
               {telemetry.by_error.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">{telemetry.by_error.map((e) => <span key={e.category} className="rounded border border-red-500/20 px-1.5 py-0.5 text-[10px] text-red-600 dark:text-red-400">{e.category}: {e.count}</span>)}</div>
+                <div className="mt-2 flex flex-wrap gap-1">{telemetry.by_error.map((e) => <span key={e.category} className="rounded border border-red-500/20 px-1.5 py-0.5 text-[11px] text-red-600 dark:text-red-400">{e.category}: {e.count}</span>)}</div>
               )}
             </>
           ) : (
@@ -224,7 +235,7 @@ export default async function ReportPage({ params }) {
           {s.automation_blueprint.steps.length > 0 && (
             <ol className="list-decimal space-y-1 pl-5">
               {s.automation_blueprint.steps.map((st) => (
-                <li key={st.sequence}>{st.action} <span className="text-[10px] text-muted-foreground">[{st.action_type}]</span></li>
+                <li key={st.sequence}>{st.action} <span className="text-[11px] text-muted-foreground">[{st.action_type}]</span></li>
               ))}
             </ol>
           )}
@@ -268,7 +279,7 @@ export default async function ReportPage({ params }) {
           ) : <p className="text-muted-foreground">No explicit business rules captured.</p>}
           {s.business_rules.exceptions.length > 0 && (
             <div className="mt-2">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Exceptions</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Exceptions</p>
               <ul className="list-disc space-y-1 pl-5">{s.business_rules.exceptions.map((e, i) => <li key={i}>{e.scenario}: {e.behavior}</li>)}</ul>
             </div>
           )}
@@ -279,7 +290,7 @@ export default async function ReportPage({ params }) {
           <div className="space-y-2">
             {s.risk_areas.map((r, i) => (
               <div key={i} className="flex items-start gap-2">
-                <span className={cn('shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium capitalize', RISK[r.severity] || RISK.low)}>{r.severity}</span>
+                <span className={cn('shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium capitalize', RISK[r.severity] || RISK.low)}>{r.severity}</span>
                 <span><span className="font-medium">{r.area}.</span> <span className="text-muted-foreground">{r.detail}</span></span>
               </div>
             ))}
@@ -288,7 +299,7 @@ export default async function ReportPage({ params }) {
 
         {/* 6. Recommended architecture */}
         <Section n="7" title="Recommended architecture">
-          <p className="mb-1"><span className="font-semibold text-foreground">{s.recommended_architecture.name}</span> <span className="text-[11px] capitalize text-muted-foreground">({s.recommended_architecture.suitability} fit)</span></p>
+          <p className="mb-1"><span className="font-semibold text-foreground">{s.recommended_architecture.name}</span> <span className="text-xs capitalize text-muted-foreground">({s.recommended_architecture.suitability} fit)</span></p>
           <p className="mb-2 text-muted-foreground">{s.recommended_architecture.reason}</p>
           {s.recommended_architecture.alternatives.length > 0 && (
             <p className="text-[12px] text-muted-foreground"><span className="font-medium">Alternatives:</span> {s.recommended_architecture.alternatives.map((a) => a.name).join(', ')}.</p>
@@ -347,7 +358,7 @@ export default async function ReportPage({ params }) {
           <ol className="list-decimal space-y-1 pl-5">{s.next_steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
         </Section>
 
-        <footer className="mt-10 border-t border-border pt-4 text-center text-[10px] text-muted-foreground">
+        <footer className="mt-10 border-t border-border pt-4 text-center text-[11px] text-muted-foreground">
           Generated by Vyrade · Costs and risks reflect verified data where available; unknowns are shown, not guessed.
         </footer>
       </main>

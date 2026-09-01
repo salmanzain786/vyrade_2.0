@@ -1,11 +1,9 @@
-import AdoptionSidebar from '@/components/adoption/AdoptionSidebar';
+import { getCurrentUser } from '@/lib/auth/session';
+import AppShellRail from '@/components/shell/AppShellRail';
 
 // Shared chrome for the organisation dashboard (Phase 2 pages).
-export default function OrgLayout({ children }) {
-  return (
-    <div className="min-h-screen bg-background">
-      <AdoptionSidebar />
-      <div className="md:pl-60">{children}</div>
-    </div>
-  );
+// Uses the same homepage icon rail across the app for a consistent shell.
+export default async function OrgLayout({ children }) {
+  const user = await getCurrentUser();
+  return <AppShellRail user={user}>{children}</AppShellRail>;
 }
